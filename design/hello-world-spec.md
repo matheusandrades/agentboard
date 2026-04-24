@@ -123,9 +123,9 @@ on mobile, `44px` on tablet, auto on desktop.
 │   from a calm corner    │
 │   of the internet.      │
 │                         │
-│   ┌─────────────────┐   │
-│   │   Say hello     │   │   ← full-width minus 22px padding
-│   └─────────────────┘   │
+│     ┌───────────┐       │
+│     │ Say hello │       │   ← content-width pill, centered
+│     └───────────┘       │
 │                         │
 ├─────────────────────────┤
 │  Privacy · Terms        │
@@ -139,15 +139,19 @@ on mobile, `44px` on tablet, auto on desktop.
 
 ### 5.1 Top nav
 
-- **Height:** 64px desktop, 48px mobile.
+- **Height:** 64px at `≥ 734px`, 48px below. (Tablet uses the desktop nav
+  — only true mobile gets the shorter bar.)
 - **Background:** `#FFFFFF` at rest; when `scrollY > 8px`, switch to
   `rgba(255,255,255,0.8)` + `backdrop-filter: blur(20px)` and add a 1px
   bottom border in `border/hairline`.
 - **Position:** `sticky; top: 0; z-index: 50`.
 - **Wordmark:** left-aligned, 17px weight 500, `text/primary`.
 - **Links:** right-aligned group, gap 32px, 14px, `text/primary`, no
-  underline, hover darkens to `#000`. Mobile: hide, show "Menu" label
+  underline, hover darkens to `#000`. Visible at `≥ 734px` (tablet +
+  desktop). Below 734px: hide the link list, show "Menu" label
   (non-functional for v1 — just an affordance).
+- **Breakpoint:** the mobile↔desktop-nav switch is **734px**, not 768px
+  (Tailwind's default `md`) and not 1024px. Use a custom media query.
 
 ### 5.2 Hero
 
@@ -166,7 +170,9 @@ on mobile, `44px` on tablet, auto on desktop.
 - **Active:** bg `#006EDB`.
 - **Focus-visible:** outline `3px solid rgba(0,113,227,0.4)`, offset `2px`.
 - **Disabled:** bg `#0071E3` at 40% opacity, cursor `not-allowed`.
-- **Mobile:** full width minus 22px horizontal page padding on either side.
+- **Width:** content-width at every breakpoint. Centered in the hero,
+  never full-bleed. (Apple's CTAs hug their label — a full-width pill on
+  mobile reads as a form button, not a marketing action.)
 
 ### 5.4 Footer
 
@@ -183,12 +189,17 @@ on mobile, `44px` on tablet, auto on desktop.
 
 | Name     | Width              | Notes                                          |
 | -------- | ------------------ | ---------------------------------------------- |
-| mobile   | `< 734px`          | Single column, reduced typography              |
-| tablet   | `734px – 1023px`   | Same layout as desktop, tighter padding        |
-| desktop  | `≥ 1024px`         | Full spec above                                |
+| mobile   | `< 734px`          | Single column, reduced typography, "Menu" affordance in nav, 48px nav height |
+| tablet   | `734px – 1023px`   | **Desktop-style nav** (links visible, 64px tall), tighter page padding (44px) |
+| desktop  | `≥ 1024px`         | Full spec above, 980px container centered                                   |
 
 Use the actual Apple breakpoints (734 / 1024) — they're slightly unusual
-but proven.
+but proven. **The critical switch is 734px**: above it the page behaves
+like a wide canvas; below it everything becomes a phone.
+
+> Implementation note: Tailwind's default `md` breakpoint is 768px, which
+> is *close to* but not 734. Extend the theme (`screens: { tablet: '734px' }`)
+> rather than relying on `md:`.
 
 ---
 
