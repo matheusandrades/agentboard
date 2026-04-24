@@ -24,7 +24,10 @@ font-family:
   system-ui, sans-serif;
 ```
 
-| Token              | Size (desktop) | Size (mobile) | Weight | Line-height | Letter-spacing | Use                        |
+Sizes below list **mobile (< 734px)** vs **tablet+desktop (≥ 734px)**.
+This page has a **single layout breakpoint at 734px** — see §6.
+
+| Token              | Size (≥734px)  | Size (<734px) | Weight | Line-height | Letter-spacing | Use                        |
 | ------------------ | -------------- | ------------- | ------ | ----------- | -------------- | -------------------------- |
 | `display/hero`     | 80px (5rem)    | 48px (3rem)   | 600    | 1.05        | -0.015em       | "Hello World" headline     |
 | `body/tagline`     | 24px (1.5rem)  | 19px (≈1.2rem)| 400    | 1.4         | 0              | Hero subhead               |
@@ -156,8 +159,10 @@ on mobile, `44px` on tablet, auto on desktop.
 ### 5.2 Hero
 
 - **Container:** max-width 980px, centered, text-align center.
-- **Vertical rhythm:** 96px top padding, 128px bottom padding (desktop).
-  On mobile: 56px top / 72px bottom.
+- **Vertical rhythm:** 96px top / 128px bottom at `≥ 734px`.
+  56px top / 72px bottom at `< 734px`.
+- **Horizontal padding:** 22px at `< 734px`, 44px at `≥ 734px`
+  (falls to auto once the 980px container fits).
 - **Headline → tagline:** 24px gap.
 - **Tagline → CTA:** 32px gap.
 
@@ -178,28 +183,37 @@ on mobile, `44px` on tablet, auto on desktop.
 
 - **Background:** `bg/subtle` (`#F5F5F7`).
 - **Top border:** 1px `border/hairline`.
-- **Padding:** 24px vertical, page padding horizontal.
-- **Content:** two rows (links left, copyright right) on desktop; stacked
-  on mobile.
+- **Padding:** 24px vertical. Horizontal follows the page scale:
+  22px at `< 734px`, 44px at `≥ 734px` (auto once the 980px
+  container fits).
+- **Content:** stacked (links above copyright) at `< 734px`;
+  single row (links left, copyright right) at `≥ 734px`.
 - **Text:** 12px, `text/secondary`, links hover → `text/primary`.
 
 ---
 
 ## 6. Breakpoints
 
-| Name     | Width              | Notes                                          |
-| -------- | ------------------ | ---------------------------------------------- |
-| mobile   | `< 734px`          | Single column, reduced typography, "Menu" affordance in nav, 48px nav height |
-| tablet   | `734px – 1023px`   | **Desktop-style nav** (links visible, 64px tall), tighter page padding (44px) |
-| desktop  | `≥ 1024px`         | Full spec above, 980px container centered                                   |
+**This page has exactly one layout breakpoint: 734px.** Everything that
+changes between phone and not-phone changes at 734 — nav height, nav link
+visibility, hero typography, hero padding, footer layout, footer padding.
+No rule should flip at any other pixel value.
 
-Use the actual Apple breakpoints (734 / 1024) — they're slightly unusual
-but proven. **The critical switch is 734px**: above it the page behaves
-like a wide canvas; below it everything becomes a phone.
+| Name     | Width              | What changes at this boundary                                          |
+| -------- | ------------------ | ---------------------------------------------------------------------- |
+| mobile   | `< 734px`          | Single column · reduced typography (48px hero, 19px tagline) · "Menu" affordance · 48px nav height · 22px page padding · stacked footer |
+| tablet+  | `≥ 734px`          | Desktop-style nav (links visible, 64px tall) · full typography (80px hero, 24px tagline) · 44px page padding · single-row footer |
+
+> **1024px is NOT a layout breakpoint.** It only matters as a visual
+> side-effect: once the viewport exceeds ~1068px (980px container + 44×2
+> padding), horizontal padding naturally falls to `auto` because the
+> fixed-width container takes over. No media query needed for that
+> transition — let the container do the work.
 
 > Implementation note: Tailwind's default `md` breakpoint is 768px, which
-> is *close to* but not 734. Extend the theme (`screens: { tablet: '734px' }`)
-> rather than relying on `md:`.
+> is *close to* but not 734. Extend the theme
+> (`screens: { tablet: '734px' }`) and use `tablet:` as the only
+> responsive prefix on this page. Do not use `md:` or `lg:`.
 
 ---
 
