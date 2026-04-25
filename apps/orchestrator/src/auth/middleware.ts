@@ -118,6 +118,13 @@ const PUBLIC_ROUTES = new Set([
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/me',
+  // OAuth callback comes from GitHub redirecting the user — they're
+  // already logged in (the session cookie travels with the redirect),
+  // but we keep this in the allowlist so the response doesn't 401 if
+  // their session expired during the round-trip.
+  '/api/github/oauth/callback',
+  // GitHub webhook deliveries are signed by HMAC, not by our session.
+  '/api/github/webhook',
 ]);
 
 export async function requireSession(req: FastifyRequest, reply: FastifyReply): Promise<void> {

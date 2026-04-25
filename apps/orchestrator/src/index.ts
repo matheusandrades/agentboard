@@ -9,6 +9,7 @@ import { registerHelloRoute } from './api/hello.js';
 import { registerWsRoutes } from './api/ws.js';
 import { registerAuthRoutes } from './api/auth.js';
 import { registerFilesRoutes } from './api/files.js';
+import { registerWebhookRoutes } from './api/webhooks.js';
 import { registerAuth, needsSetupGate, requireSession } from './auth/middleware.js';
 import { startDispatcher } from './agents/dispatcher.js';
 import { startNotificationDispatcher } from './notifications/dispatcher.js';
@@ -46,6 +47,7 @@ async function buildApp() {
   app.addHook('preHandler', requireSession);
 
   await registerAuthRoutes(app);
+  await registerWebhookRoutes(app);
   await registerHttpRoutes(app);
   await registerFilesRoutes(app);
   await registerHelloRoute(app);
