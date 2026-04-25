@@ -184,50 +184,33 @@ export function Settings() {
 
           {loading ? (
             <p className="mt-6 text-[12px] text-fg-3">Checking…</p>
-          ) : status?.connected ? (
-            <div className="mt-5 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoBlock label="Signed in as" value={status.login ?? '—'} />
-                <InfoBlock label="Mode" value={modeLabel(status.mode)} />
-                <InfoBlock
-                  label="Scopes"
-                  value={status.scopes && status.scopes.length ? status.scopes.join(', ') : '—'}
-                />
-                <InfoBlock label="Detail" value={status.detail ?? ''} dim />
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <Link to="/projects" className="btn btn-sm">
-                  Connect a repo →
-                </Link>
-                {status.mode === 'gh' ? (
-                  <p className="text-[11px] text-fg-3">
-                    Using <code className="font-mono">gh</code> — log out with{' '}
-                    <code className="font-mono">gh auth logout</code> on the host.
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn-danger btn-sm"
-                    onClick={disconnect}
-                    disabled={disconnecting}
-                  >
-                    {disconnecting
-                      ? '…'
-                      : status.mode === 'oauth'
-                        ? 'Disconnect OAuth'
-                        : 'Disconnect PAT'}
-                  </button>
-                )}
-              </div>
-            </div>
           ) : (
-            <div className="mt-5 space-y-5">
-              {/* Recommended path: GitHub App */}
+            <div className="mt-5 space-y-4">
+              {/* Connected banner — surfaces active mode but does NOT hide
+                  the other options. Switching is one click away. */}
+              {status?.connected ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-ok/30 bg-ok-soft/40 px-4 py-2.5 text-[12px]">
+                  <span className="pill pill-ok text-[10px]">active</span>
+                  <span className="text-fg">{status.login}</span>
+                  <span className="text-fg-3">via</span>
+                  <span className="font-mono text-fg-2">{modeLabel(status.mode)}</span>
+                  <Link to="/projects" className="btn-ghost btn-sm ml-auto">
+                    Connect a repo →
+                  </Link>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-2.5 text-[12px] text-fg-2">
+                  Not connected. Pick a method below.
+                </div>
+              )}
+
+              {/* Show ALL three connection methods so the operator can
+                  switch (App ↔ OAuth ↔ PAT) without leaving this card. */}
               {appCfg ? (
                 <GithubAppSection
                   cfg={appCfg}
                   isAdmin={me?.role === 'admin'}
+                  isActive={status?.mode === 'app'}
                   onCreate={() => setShowAppCreate(true)}
                   onForget={async () => {
                     if (!confirm('Forget the saved GitHub App? You will need to recreate it.'))
@@ -235,17 +218,41 @@ export function Settings() {
                     await api.githubAppForget();
                     await refresh();
                   }}
+                  onDisconnectInstallation={async () => {
+                    if (
+                      !confirm(
+                        "Disconnect the App's installation? The App stays registered, you can re-install later.",
+                      )
+                    )
+                      return;
+                    await api.githubAppDisconnectInstallation();
+                    await refresh();
+                  }}
                 />
               ) : null}
 
+              {/* OAuth section — always shown so the operator can switch
+                  to OAuth even after the App is connected. */}
               {oauthCfg?.enabled ? (
-                <div className="rounded-xl border border-hairline bg-sheen/[0.03] p-4">
+                <div
+                  className={[
+                    'rounded-xl border p-4',
+                    status?.mode === 'oauth'
+                      ? 'border-accent/40 bg-accent-soft'
+                      : 'border-hairline bg-sheen/[0.03]',
+                  ].join(' ')}
+                >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-fg">Connect with GitHub</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[13px] font-medium text-fg">OAuth App</p>
+                        {status?.mode === 'oauth' ? (
+                          <span className="pill pill-ok text-[10px]">active</span>
+                        ) : null}
+                      </div>
                       <p className="mt-1 text-[11.5px] text-fg-2">
-                        Opens a GitHub authorisation window. Recommended — single click, scoped
-                        token, easy to revoke.
+                        User-scoped token — sees every org you can. Best when the GitHub App
+                        installation can't reach the org you need.
                         {oauthCfg.clientIdMasked ? (
                           <>
                             {' '}
@@ -258,14 +265,25 @@ export function Settings() {
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={startOauth}
-                        disabled={oauthBusy}
-                      >
-                        {oauthBusy ? 'Waiting for GitHub…' : 'Connect GitHub'}
-                      </button>
+                      {status?.mode === 'oauth' ? (
+                        <button
+                          type="button"
+                          className="btn-danger btn-sm"
+                          onClick={disconnect}
+                          disabled={disconnecting}
+                        >
+                          {disconnecting ? '…' : 'Disconnect'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={startOauth}
+                          disabled={oauthBusy}
+                        >
+                          {oauthBusy ? 'Waiting…' : 'Connect with OAuth'}
+                        </button>
+                      )}
                       {me?.role === 'admin' && oauthCfg.source === 'db' ? (
                         <button
                           type="button"
@@ -306,6 +324,37 @@ export function Settings() {
                   </p>
                 </div>
               )}
+
+              {/* PAT card — active when status.mode === 'pat' or 'gh' */}
+              {status?.mode === 'pat' || status?.mode === 'gh' ? (
+                <div className="rounded-xl border border-accent/40 bg-accent-soft p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[13px] font-medium text-fg">
+                          {status.mode === 'gh' ? 'gh CLI (host)' : 'Personal Access Token'}
+                        </p>
+                        <span className="pill pill-ok text-[10px]">active</span>
+                      </div>
+                      <p className="mt-1 text-[11.5px] text-fg-2">
+                        {status.mode === 'gh'
+                          ? 'Using your local gh CLI auth. Run `gh auth logout` on the host to disconnect.'
+                          : 'Connected via PAT.'}
+                      </p>
+                    </div>
+                    {status.mode === 'pat' ? (
+                      <button
+                        type="button"
+                        className="btn-danger btn-sm shrink-0"
+                        onClick={disconnect}
+                        disabled={disconnecting}
+                      >
+                        {disconnecting ? '…' : 'Disconnect'}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               <div>
                 <button
@@ -585,13 +634,17 @@ function OauthSetupDialog({
 function GithubAppSection({
   cfg,
   isAdmin,
+  isActive,
   onCreate,
   onForget,
+  onDisconnectInstallation,
 }: {
   cfg: api.GithubAppConfig;
   isAdmin: boolean;
+  isActive: boolean;
   onCreate: () => void;
   onForget: () => void;
+  onDisconnectInstallation: () => void;
 }) {
   if (cfg.configured) {
     return (
@@ -599,23 +652,33 @@ function GithubAppSection({
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-[13px] font-medium text-fg">GitHub App ready</p>
-              <span className="pill pill-ok text-[10px]">recommended</span>
+              <p className="text-[13px] font-medium text-fg">GitHub App</p>
+              {isActive ? (
+                <span className="pill pill-ok text-[10px]">active</span>
+              ) : (
+                <span className="pill pill-ok text-[10px]">recommended</span>
+              )}
             </div>
             <p className="mt-1 text-[11.5px] text-fg-2">
-              The App <span className="font-mono text-fg">{cfg.slug}</span> is registered. Install
-              it on the orgs / repos you want agents to operate on.
+              {isActive
+                ? `Active installation for ${cfg.slug}. Agents are using its scoped token.`
+                : `App ${cfg.slug} is registered. Install it on the orgs / repos you want agents to operate on.`}
+              {' '}
+              <span className="text-fg-3">
+                Tip: if the org you want isn't visible, install the App on it OR connect via OAuth
+                instead — OAuth sees every org your account belongs to.
+              </span>
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {cfg.installUrl ? (
               <a
-                className="btn btn-sm"
+                className={isActive ? 'btn-ghost btn-sm' : 'btn btn-sm'}
                 href={cfg.installUrl}
                 target="_blank"
                 rel="noreferrer"
               >
-                Install on a repo ↗
+                {isActive ? 'Install on more ↗' : 'Install on a repo ↗'}
               </a>
             ) : null}
             {cfg.htmlUrl ? (
@@ -625,8 +688,17 @@ function GithubAppSection({
                 target="_blank"
                 rel="noreferrer"
               >
-                Manage on GitHub ↗
+                Manage ↗
               </a>
+            ) : null}
+            {isActive ? (
+              <button
+                type="button"
+                className="btn-danger btn-sm"
+                onClick={onDisconnectInstallation}
+              >
+                Disconnect
+              </button>
             ) : null}
             {isAdmin ? (
               <button type="button" className="btn-ghost btn-sm" onClick={onForget}>

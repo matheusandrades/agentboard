@@ -91,11 +91,11 @@ export function Layout() {
       {/* Sidebar — hidden on mobile, visible md+ */}
       <aside className="relative hidden w-[76px] shrink-0 flex-col items-center border-r border-hairline bg-canvas-sunken/50 py-4 backdrop-blur-xl md:flex">
         <Brand />
-        <nav className="mt-6 flex flex-1 flex-col items-center gap-0.5 self-stretch">
+        <nav className="mt-4 flex flex-1 flex-col items-center self-stretch">
           {NAV_GROUPS.map((group, gi) => (
             <div key={group.label} className="flex flex-col items-center self-stretch">
               {gi > 0 ? (
-                <div className="my-2 h-px w-8 self-center bg-hairline" aria-hidden />
+                <div className="my-1 h-px w-8 self-center bg-hairline" aria-hidden />
               ) : null}
               {group.items.map((item) => (
                 <NavItemButton
@@ -108,15 +108,11 @@ export function Layout() {
           ))}
         </nav>
 
-        {/* Footer: settings + version */}
-        <div className="mt-auto flex w-full flex-col items-center gap-2 pt-3">
+        {/* Footer: just a tiny version line. Settings now lives in the
+            top-right user menu, so we don't compete for sidebar height. */}
+        <div className="flex w-full shrink-0 flex-col items-center gap-1 pt-2">
           <div className="h-px w-8 bg-hairline" aria-hidden />
-          <NavItemButton item={FOOTER_NAV} badge={0} />
-          <div className="dateline pb-1 pt-1 text-center text-[9px]">
-            v0.1
-            <br />
-            PREVIEW
-          </div>
+          <div className="dateline pb-1 pt-1 text-center text-[9px]">v0.1</div>
         </div>
       </aside>
 
@@ -240,7 +236,7 @@ function NavItemButton({ item, badge }: { item: NavItem; badge: number }) {
       title={item.label}
       className={({ isActive }) =>
         [
-          'group relative flex w-14 flex-col items-center justify-center gap-1 rounded-xl py-2 text-fg-3 transition',
+          'group relative flex w-14 flex-col items-center justify-center gap-0.5 rounded-xl py-1.5 text-fg-3 transition',
           isActive
             ? 'bg-sheen/[0.06] text-fg shadow-glass-sm'
             : 'hover:bg-sheen/[0.03] hover:text-fg',
@@ -561,6 +557,16 @@ function UserMenu() {
                 }}
               >
                 Change password
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
+                onClick={() => {
+                  setOpen(false);
+                  navigate('/settings');
+                }}
+              >
+                Settings + integrations
               </button>
               {user.role === 'admin' ? (
                 <button
