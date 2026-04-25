@@ -4,8 +4,24 @@ import { AgentCard } from '@/components/AgentCard';
 import { AgentNewDialog } from '@/components/AgentNewDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { AGENT_ROLES, type AgentRole } from '@agentboard/shared';
+import { ROLE_TINT } from '@/lib/roles';
 
 type RoleFilter = 'all' | AgentRole;
+
+// Short, single-word filter labels. The full title still shows on the
+// agent card itself — chips are just navigation, they don't need the
+// formal "Database Administrator" / "Language Specialist" wording.
+const ROLE_SHORT: Record<AgentRole, string> = {
+  pm: 'PM',
+  cto: 'CTO',
+  'ui-ux': 'UI/UX',
+  'lang-specialist': 'Language',
+  frontend: 'Frontend',
+  backend: 'Backend',
+  dba: 'DBA',
+  qa: 'QA',
+  cybersec: 'Security',
+};
 
 export function Agents() {
   const agents = useBoardStore((s) => s.agents);
@@ -38,32 +54,35 @@ export function Agents() {
           </>
         }
         actions={
-          <>
-            <div className="flex items-center gap-1.5">
-              <FilterChip
-                active={filter === 'all'}
-                onClick={() => setFilter('all')}
-                label="All"
-                count={agents.length}
-              />
-              {roles.map(([r, n]) => (
-                <FilterChip
-                  key={r}
-                  active={filter === r}
-                  onClick={() => setFilter(r)}
-                  label={AGENT_ROLES[r]?.title ?? r}
-                  count={n}
-                />
-              ))}
-            </div>
-            <span className="mx-1 h-5 w-px bg-hairline" />
-            <button type="button" className="btn btn-sm" onClick={() => setCreating(true)}>
-              <span className="text-sm leading-none">＋</span>
-              New
-            </button>
-          </>
+          <button type="button" className="btn btn-sm" onClick={() => setCreating(true)}>
+            <span className="text-sm leading-none">+</span>
+            New agent
+          </button>
         }
       />
+
+      {/* Filter rail — its own row so 9 chips never push the title around */}
+      <div className="shrink-0 border-b border-hairline">
+        <div className="flex items-center gap-1.5 overflow-x-auto px-6 py-2 [scrollbar-width:thin]">
+          <FilterChip
+            active={filter === 'all'}
+            onClick={() => setFilter('all')}
+            label="All"
+            count={agents.length}
+          />
+          {roles.map(([r, n]) => (
+            <FilterChip
+              key={r}
+              active={filter === r}
+              onClick={() => setFilter(r)}
+              label={ROLE_SHORT[r] ?? AGENT_ROLES[r]?.title ?? r}
+              count={n}
+              tint={ROLE_TINT[r]}
+              title={AGENT_ROLES[r]?.title ?? r}
+            />
+          ))}
+        </div>
+      </div>
 
       <div className="grid flex-1 gap-3 overflow-auto px-6 py-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filtered.length === 0 ? (
@@ -92,25 +111,35 @@ function FilterChip({
   count,
   active,
   onClick,
+  tint,
+  title,
 }: {
   label: string;
   count: number;
   active: boolean;
   onClick: () => void;
+  tint?: string;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       className={[
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition duration-150',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] transition duration-150',
         active
-          ? 'border-violet/50 bg-violet-soft text-fg shadow-glow-sm'
+          ? 'border-accent/50 bg-accent-soft text-fg'
           : 'border-hairline bg-sheen/[0.02] text-fg-2 hover:border-hairline-strong hover:text-fg',
       ].join(' ')}
     >
-      <span>{label}</span>
-      <span className={['tnum text-[10px]', active ? 'text-violet-bright' : 'text-fg-3'].join(' ')}>
+      <span className={!active && tint ? tint : ''}>{label}</span>
+      <span
+        className={[
+          'rounded-md bg-sheen/[0.06] px-1 font-mono text-[10px] tnum',
+          active ? 'text-fg' : 'text-fg-3',
+        ].join(' ')}
+      >
         {count}
       </span>
     </button>
