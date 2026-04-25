@@ -98,6 +98,20 @@ vi.mock('../db/client.js', () => {
 
 vi.mock('./persona.js', () => ({
   loadPersona: async () => 'You are a test agent.',
+  loadRulesTemplate: async () => '',
+  buildSystemPrompt: async () => 'You are a test agent.',
+}));
+
+// Skip the cost-cap check entirely so the test doesn't have to mock the
+// usageEvents query path that `checkBudget` exercises.
+vi.mock('../lib/budget.js', () => ({
+  checkBudget: async () => ({
+    allow: true,
+    spentTodayMicroUsd: 0,
+    spentTotalMicroUsd: 0,
+    dailyCapMicroUsd: 0,
+    totalCapMicroUsd: 0,
+  }),
 }));
 
 vi.mock('../mcp/server.js', () => ({

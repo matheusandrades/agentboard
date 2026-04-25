@@ -100,8 +100,14 @@ describe('create_task tool', () => {
     });
 
     expect(result.content[0]?.text).toMatch(/Created task/);
-    expect(state.insertedTasks).toHaveLength(1);
-    expect((state.insertedTasks[0] as { assigneeId: string }).assigneeId).toBe(
+    // Two inserts now: the task row + the assignment message that wakes the
+    // assignee. Filter to the task-shaped row.
+    const taskRows = state.insertedTasks.filter(
+      (r): r is { title: string; assigneeId?: string } =>
+        typeof (r as { title?: unknown }).title === 'string',
+    );
+    expect(taskRows).toHaveLength(1);
+    expect((taskRows[0] as { assigneeId: string }).assigneeId).toBe(
       'bbbb0000-0000-0000-0000-000000000000',
     );
     expect(state.enqueueCalls).toEqual(['bbbb0000-0000-0000-0000-000000000000']);
