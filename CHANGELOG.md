@@ -5,6 +5,73 @@ and the project tracks [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-04-25
+
+Big GitHub + DX release. The install flow now ends with a 1-click
+GitHub App setup, the file viewer behaves like VS Code, navigation into
+a project is friction-less, and organizations are first-class.
+
+### Added
+
+#### VSCode-style file viewer
+- Multi-file tabs (open / switch / close, up to 10 at once) with an
+  active-tab underline.
+- Cmd / Ctrl + P opens a fuzzy file picker over the whole project,
+  ranked by filename match → path match → path length. Backed by a new
+  `GET /api/projects/:id/files/search` endpoint.
+- Distinct icons per file kind (TS, JS, JSON, CSS, HTML, MD, YAML, SH,
+  image, lock-file, generic code).
+- Active path is highlighted in the tree.
+
+#### One-click GitHub App
+- New `app_settings.github.app` row stores the App's id, slug, client
+  id/secret, private key (PEM) and webhook secret — all created via
+  GitHub's manifest flow so the operator never has to copy-paste.
+- New endpoints: `POST /api/github/app/manifest` (admin builds a
+  manifest), `GET /api/github/app/manifest/callback` (exchanges the
+  one-shot code), `GET /api/github/app/install` (redirects to install
+  page), `GET /api/github/app/installation/callback` (saves the
+  installation_id), and admin `DELETE /api/github/app{,/config}`.
+- `github/app.ts` mints RS256 App JWTs and per-installation tokens
+  (with a 60s-buffer in-memory cache).
+- `getActiveToken()` picks the right credential automatically — App
+  installation token first, OAuth, then PAT.
+- Settings page gains a 'GitHub App (recommended)' section above the
+  OAuth one. Configured state shows the slug + Install button +
+  Manage-on-GitHub link.
+
+#### Multi-step install wizard
+- After the first admin is created, the wizard now shows a second step
+  that walks through connecting GitHub (App recommended, OAuth
+  fallback) or skipping. Tracks state in `auth.postSetupPending`.
+
+#### GitHub organizations as first-class
+- New `GET /api/github/accounts` lists the owner accounts the active
+  connection can see (your user + all orgs in OAuth/PAT mode, one
+  entry per App installation otherwise).
+- `GET /api/github/repos?owner=…` filters the repo list by account.
+- ConnectRepoDialog gains an Account dropdown when multiple owners are
+  visible.
+
+### Changed
+
+#### Navigation flow
+- Sidebar: 'Repos' → 'Projects'; Code group reordered so the path
+  Projects → Commits → Preview reads top-down.
+- ProjectDetail: replaced the cramped header-with-pill-tabs with a
+  proper hero (breadcrumb 'Projects / owner / repo' → big title →
+  visibility/branch/description pills, GitHub link on the right).
+  Tabs moved to a dedicated rail with horizontal scroll and live
+  counts. **Files is the default tab** — clicking a project lands on
+  the code, not on a stats overview.
+- Tab order optimised for intent: Files → Tasks → Pulls → Issues →
+  Branches → Overview.
+
+### Fixed
+- Prism could throw `tokenizePlaceholders is undefined` when a
+  language grammar's dependency wasn't loaded. We now degrade
+  gracefully to plain text.
+
 ## [0.3.0] — 2026-04-25
 
 Big surface release: VSCode-style file browser, deep GitHub integration
@@ -242,7 +309,8 @@ real GitHub repos.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, MIT `LICENSE`.
 - `.github/` issue templates, PR template, CI (typecheck + tests).
 
-[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.4.0
 [0.3.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.1.0
