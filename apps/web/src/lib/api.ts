@@ -194,6 +194,32 @@ export const importIssue = (id: string, number: number, assigneeId?: string | nu
     body: { assigneeId },
   });
 
+// ---------- Files ----------
+export interface TreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  size?: number;
+  ignored?: boolean;
+}
+export interface TreeResponse {
+  path: string;
+  truncated: boolean;
+  entries: TreeEntry[];
+}
+export interface FileResponse {
+  path: string;
+  size: number;
+  encoding: 'utf8' | 'binary' | 'too-large';
+  language: string;
+  content?: string;
+  truncated: boolean;
+}
+export const projectTree = (id: string, dirPath = '') =>
+  request<TreeResponse>('GET', `/api/projects/${id}/tree`, { query: { path: dirPath } });
+export const projectFile = (id: string, filePath: string) =>
+  request<FileResponse>('GET', `/api/projects/${id}/file`, { query: { path: filePath } });
+
 // ---------- Notifications ----------
 export interface NotificationConfig {
   id: string;

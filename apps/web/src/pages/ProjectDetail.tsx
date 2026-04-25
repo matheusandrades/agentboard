@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
+import { FileBrowser } from '@/components/FileBrowser';
 import { useBoardStore } from '@/lib/store';
 import { relativeTime } from '@/lib/time';
 import * as api from '@/lib/api';
@@ -11,7 +12,7 @@ import type {
   PullRequestSummary,
 } from '@/lib/types';
 
-type Tab = 'overview' | 'pulls' | 'issues' | 'branches' | 'tasks';
+type Tab = 'overview' | 'files' | 'pulls' | 'issues' | 'branches' | 'tasks';
 
 export function ProjectDetail() {
   const { id = '' } = useParams();
@@ -117,7 +118,7 @@ export function ProjectDetail() {
         }
         actions={
           <div className="flex items-center gap-1.5">
-            {(['overview', 'pulls', 'issues', 'branches', 'tasks'] as Tab[]).map((t) => (
+            {(['overview', 'files', 'pulls', 'issues', 'branches', 'tasks'] as Tab[]).map((t) => (
               <Tabber key={t} active={tab === t} onClick={() => setTab(t)} label={tabLabel(t)} />
             ))}
             <button type="button" className="btn-ghost btn-sm" onClick={refresh}>
@@ -133,7 +134,15 @@ export function ProjectDetail() {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+      {/* Files tab takes the full pane (no padding/scroll wrapper) */}
+      {tab === 'files' ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <FileBrowser project={project} />
+        </div>
+      ) : null}
+
+      {tab !== 'files' ? (
+        <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {tab === 'overview' ? (
           <Overview
             project={project}
@@ -194,7 +203,8 @@ export function ProjectDetail() {
         {tab === 'tasks' ? (
           <TasksTab project={project} agentById={agentById} />
         ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -203,6 +213,8 @@ function tabLabel(t: Tab): string {
   switch (t) {
     case 'overview':
       return 'Overview';
+    case 'files':
+      return 'Files';
     case 'pulls':
       return 'Pulls';
     case 'issues':
