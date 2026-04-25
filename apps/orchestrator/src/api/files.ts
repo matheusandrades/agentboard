@@ -136,6 +136,61 @@ async function loadProject(reply: FastifyReply, id: string) {
   return p;
 }
 
+/**
+ * Walk the project (skipping HIDDEN_DIRS) collecting up to `limit` file
+ * paths whose name or path matches `query`. Used by the Cmd+P quick
+ * file picker on the frontend.
+ */
+async function searchFiles(
+  rootAbs: string,
+  query: string,
+  limit: number,
+): Promise<Array<{ path: string; name: string; size: number; score: number }>> {
+  const q = query.toLowerCase();
+  const results: Array<{ path: string; name: string; size: number; score: number }> = [];
+  const stack: Array<{ abs: string; rel: string }> = [{ abs: rootAbs, rel: '' }];
+  while (stack.length && results.length < limit * 4) {
+    const { abs, rel } = stack.pop()!;
+    let entries: import('node:fs').Dirent[];
+    try {
+      entries = await fs.readdir(abs, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      if (HIDDEN_DIRS.has(e.name)) continue;
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      const childAbs = path.join(abs, e.name);
+      if (e.isDirectory()) {
+        stack.push({ abs: childAbs, rel: childRel });
+      } else if (e.isFile()) {
+        const haystack = childRel.toLowerCase();
+        if (q && !haystack.includes(q)) continue;
+        let size = 0;
+        try {
+          const st = await fs.stat(childAbs);
+          size = st.size;
+        } catch {
+          /* skip */
+        }
+        // Score: filename match wins over path match; closer to the
+        // start scores higher; shorter total path scores higher.
+        const nameLower = e.name.toLowerCase();
+        const nameIdx = nameLower.indexOf(q);
+        const pathIdx = haystack.indexOf(q);
+        const score =
+          (nameIdx === 0 ? 1000 : nameIdx > -1 ? 500 - nameIdx : 0) -
+          (pathIdx > -1 ? pathIdx : 0) -
+          childRel.length;
+        results.push({ path: childRel, name: e.name, size, score });
+      }
+    }
+  }
+  return results
+    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
+    .slice(0, limit);
+}
+
 export async function registerFilesRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/api/projects/:id/tree',
@@ -192,6 +247,26 @@ export async function registerFilesRoutes(app: FastifyInstance): Promise<void> {
       } catch (err) {
         logger.warn({ err, projectId: p.id, rel }, 'tree read failed');
         return reply.code(500).send({ error: 'tree_failed', detail: (err as Error).message });
+      }
+    },
+  );
+
+  app.get(
+    '/api/projects/:id/files/search',
+    async (
+      req: FastifyRequest<{ Params: { id: string }; Querystring: { q?: string; limit?: string } }>,
+      reply,
+    ) => {
+      const p = await loadProject(reply, req.params.id);
+      if (!p) return;
+      const q = (req.query.q ?? '').trim();
+      const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 30)));
+      try {
+        const hits = await searchFiles(p.clonePath!, q, limit);
+        return { query: q, results: hits };
+      } catch (err) {
+        logger.warn({ err, projectId: p.id }, 'file search failed');
+        return reply.code(500).send({ error: 'search_failed', detail: (err as Error).message });
       }
     },
   );

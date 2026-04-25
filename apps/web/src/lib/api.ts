@@ -255,6 +255,18 @@ export const projectTree = (id: string, dirPath = '') =>
   request<TreeResponse>('GET', `/api/projects/${id}/tree`, { query: { path: dirPath } });
 export const projectFile = (id: string, filePath: string) =>
   request<FileResponse>('GET', `/api/projects/${id}/file`, { query: { path: filePath } });
+export interface FileSearchHit {
+  path: string;
+  name: string;
+  size: number;
+  score: number;
+}
+export const projectSearchFiles = (id: string, query: string, limit = 30) =>
+  request<{ query: string; results: FileSearchHit[] }>(
+    'GET',
+    `/api/projects/${id}/files/search`,
+    { query: { q: query, limit } },
+  );
 
 // ---------- Notifications ----------
 export interface NotificationConfig {
