@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthGate } from './components/AuthGate';
 import { Layout } from './components/Layout';
 import { Users } from './pages/Users';
+import { Orgs } from './pages/Orgs';
 import { Board } from './pages/Board';
 import { Agents } from './pages/Agents';
 import { AgentDetail } from './pages/AgentDetail';
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/approvals" element={<Approvals />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/orgs" element={<Orgs />} />
           <Route path="/users" element={<Users />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/chat" element={<Chat />} />

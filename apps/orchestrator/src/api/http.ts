@@ -1462,7 +1462,87 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/api/projects', async () => {
     const rows = await db.select().from(projects).orderBy(desc(projects.createdAt));
-    return rows;
+    if (rows.length === 0) return rows;
+
+    // Aggregate cheap, locally-known stats per project so /projects
+    // cards can render counts without a per-card request burst.
+    const ids = rows.map((r) => r.id);
+    const taskRows = await db
+      .select({
+        projectId: tasks.projectId,
+        status: tasks.status,
+      })
+      .from(tasks)
+      .where(inArray(tasks.projectId, ids));
+    const previewRows = await db
+      .select({ projectName: previews.projectName, status: previews.status })
+      .from(previews);
+    const commitRows = await db
+      .select({
+        taskId: commits.taskId,
+        createdAt: commits.createdAt,
+      })
+      .from(commits)
+      .orderBy(desc(commits.createdAt))
+      .limit(500);
+    // map taskId → projectId so we can attribute commits to projects.
+    const allTasks = await db
+      .select({ id: tasks.id, projectId: tasks.projectId })
+      .from(tasks)
+      .where(inArray(tasks.projectId, ids));
+    const taskToProject = new Map(allTasks.map((t) => [t.id, t.projectId]));
+
+    interface Stats {
+      tasksOpen: number;
+      tasksTotal: number;
+      tasksReview: number;
+      runningPreviews: number;
+      commits7d: number;
+      lastCommitAt: string | null;
+    }
+    const stats = new Map<string, Stats>();
+    for (const r of rows) {
+      stats.set(r.id, {
+        tasksOpen: 0,
+        tasksTotal: 0,
+        tasksReview: 0,
+        runningPreviews: 0,
+        commits7d: 0,
+        lastCommitAt: null,
+      });
+    }
+
+    for (const t of taskRows) {
+      if (!t.projectId) continue;
+      const s = stats.get(t.projectId);
+      if (!s) continue;
+      s.tasksTotal += 1;
+      if (t.status === 'in_progress' || t.status === 'todo') s.tasksOpen += 1;
+      if (t.status === 'review') s.tasksReview += 1;
+    }
+
+    for (const p of previewRows) {
+      if (!p.projectName) continue;
+      // The project name we store on previews is the docker compose
+      // project name, not the AgentBoard project. Skip — counted in
+      // /api/previews directly.
+    }
+
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    for (const c of commitRows) {
+      if (!c.taskId) continue;
+      const projectId = taskToProject.get(c.taskId);
+      if (!projectId) continue;
+      const s = stats.get(projectId);
+      if (!s) continue;
+      const ts = c.createdAt instanceof Date ? c.createdAt.getTime() : Date.parse(String(c.createdAt));
+      if (ts > sevenDaysAgo) s.commits7d += 1;
+      if (!s.lastCommitAt || (c.createdAt instanceof Date && ts > Date.parse(s.lastCommitAt))) {
+        s.lastCommitAt = c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt);
+      }
+    }
+
+    return rows.map((r) => ({ ...r, stats: stats.get(r.id) ?? null }));
   });
 
   app.post('/api/projects', async (req, reply) => {

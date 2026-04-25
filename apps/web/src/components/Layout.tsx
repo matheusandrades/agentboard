@@ -38,6 +38,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: 'Code',
     items: [
       { to: '/projects', label: 'Projects', icon: RepoIcon },
+      { to: '/orgs', label: 'Orgs', icon: OrgsIcon },
       { to: '/commits', label: 'Commits', icon: CommitIcon },
       { to: '/previews', label: 'Preview', icon: PreviewIcon },
     ],
@@ -364,6 +365,15 @@ function RepoIcon({ className }: IconProps) {
       <path d="M5 4.5h12a2 2 0 012 2v11a1.5 1.5 0 01-1.5 1.5H7a2 2 0 01-2-2V4.5z" />
       <path d="M5 17.5a2 2 0 012-2h11" />
       <path d="M9 8h6" />
+    </svg>
+  );
+}
+function OrgsIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 21V7a2 2 0 0 1 2-2h7v16" />
+      <path d="M12 21h9V11l-9-4" />
+      <path d="M7 9v0M7 12v0M7 15v0M16 13v0M16 17v0" />
     </svg>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { relativeTime } from '@/lib/time';
 import * as api from '@/lib/api';
@@ -12,6 +12,8 @@ export function Projects() {
   const [opening, setOpening] = useState(false);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ownerFilter = searchParams.get('owner') ?? '';
 
   async function refresh() {
     try {
@@ -80,10 +82,28 @@ export function Projects() {
         </div>
       ) : null}
 
+      {ownerFilter ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken/30 px-6 py-2 text-[12px] text-fg-2">
+          <span className="text-fg-3">Filtered by</span>
+          <span className="pill text-[10px]">{ownerFilter}</span>
+          <button
+            type="button"
+            className="text-fg-3 hover:text-fg"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('owner');
+              setSearchParams(next, { replace: true });
+            }}
+          >
+            ✕ clear
+          </button>
+        </div>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
         {loading ? (
           <p className="text-[13px] text-fg-3">Loading…</p>
-        ) : projects.length === 0 ? (
+        ) : projects.filter((p) => !ownerFilter || p.repoOwner === ownerFilter).length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-hairline py-24 text-center">
             <span className="text-[15px] text-fg-3">No projects connected</span>
             <p className="mt-2 max-w-md text-[11px] text-fg-2">
@@ -101,56 +121,14 @@ export function Projects() {
             ) : null}
           </div>
         ) : (
-          <ul className="grid gap-3 lg:grid-cols-2">
-            {projects.map((p) => (
-              <li key={p.id}>
-                <article className="glass overflow-hidden p-0 hover-raise">
-                  <Link to={`/projects/${p.id}`} className="block p-5">
-                    <header className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="eyebrow">{p.visibility}</span>
-                          <span className="pill tnum">{p.defaultBranch}</span>
-                        </div>
-                        <h3 className="mt-1 truncate text-[16px] font-medium tracking-tight text-fg">
-                          {p.name}
-                        </h3>
-                        <p className="mt-0.5 font-mono text-[11px] text-fg-2">
-                          {p.repoOwner}/{p.repoName}
-                        </p>
-                        {p.description ? (
-                          <p className="mt-2 line-clamp-2 text-[12.5px] text-fg-2">
-                            {p.description}
-                          </p>
-                        ) : null}
-                      </div>
-                    </header>
-                    <footer className="mt-4 flex items-center justify-between border-t border-hairline pt-3 text-[11px] text-fg-3">
-                      <span>Connected {relativeTime(p.createdAt)}</span>
-                      <span className="text-accent">Open ↗</span>
-                    </footer>
-                  </Link>
-                  <div className="flex items-center gap-2 border-t border-hairline px-4 py-2">
-                    <a
-                      href={`https://github.com/${p.repoOwner}/${p.repoName}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-fg-2 hover:text-fg hover:underline"
-                    >
-                      GitHub ↗
-                    </a>
-                    <button
-                      type="button"
-                      className="btn-ghost btn-sm ml-auto"
-                      onClick={() => onDelete(p.id)}
-                      title="Disconnect project"
-                    >
-                      Disconnect
-                    </button>
-                  </div>
-                </article>
-              </li>
-            ))}
+          <ul className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {projects
+              .filter((p) => !ownerFilter || p.repoOwner === ownerFilter)
+              .map((p) => (
+                <li key={p.id}>
+                  <ProjectCard project={p} onDelete={() => onDelete(p.id)} />
+                </li>
+              ))}
           </ul>
         )}
       </div>
@@ -168,6 +146,124 @@ export function Projects() {
 }
 
 /* ───────────────────── Connect repo sheet ──────────────────────── */
+/* ──────────────────── Project card with stats ──────────────────── */
+function ProjectCard({
+  project: p,
+  onDelete,
+}: {
+  project: Project;
+  onDelete: () => void;
+}) {
+  const stats = p.stats;
+  return (
+    <article className="glass group overflow-hidden p-0 transition hover:border-hairline-strong">
+      <Link to={`/projects/${p.id}`} className="block p-5">
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={[
+                  'pill text-[10px]',
+                  p.visibility === 'public' ? 'pill-ok' : '',
+                ].join(' ')}
+              >
+                {p.visibility}
+              </span>
+              <span className="pill text-[10px] tnum">{p.defaultBranch}</span>
+            </div>
+            <h3 className="mt-1.5 truncate text-[16px] font-medium tracking-tight text-fg">
+              {p.name}
+            </h3>
+            <p className="mt-0.5 font-mono text-[11px] text-fg-3">
+              {p.repoOwner}/{p.repoName}
+            </p>
+            {p.description ? (
+              <p className="mt-2 line-clamp-2 text-[12px] text-fg-2">{p.description}</p>
+            ) : null}
+          </div>
+        </header>
+
+        {/* Stats strip */}
+        {stats ? (
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-hairline pt-3">
+            <Stat
+              label="In flight"
+              value={stats.tasksOpen}
+              total={stats.tasksTotal}
+              tone="accent"
+            />
+            <Stat label="In review" value={stats.tasksReview} tone="warn" />
+            <Stat label="Commits 7d" value={stats.commits7d} />
+          </div>
+        ) : null}
+
+        <footer className="mt-3 flex items-center justify-between text-[11px] text-fg-3">
+          <span>
+            {stats?.lastCommitAt
+              ? `last commit ${relativeTime(stats.lastCommitAt)}`
+              : `connected ${relativeTime(p.createdAt)}`}
+          </span>
+          <span className="text-accent opacity-0 transition group-hover:opacity-100">Open →</span>
+        </footer>
+      </Link>
+      <div className="flex items-center gap-2 border-t border-hairline px-4 py-2">
+        <a
+          href={`https://github.com/${p.repoOwner}/${p.repoName}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[11px] text-fg-3 hover:text-fg hover:underline"
+        >
+          GitHub ↗
+        </a>
+        <button
+          type="button"
+          className="btn-ghost btn-sm ml-auto"
+          onClick={onDelete}
+          title="Disconnect project"
+        >
+          Disconnect
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  total,
+  tone,
+}: {
+  label: string;
+  value: number;
+  total?: number;
+  tone?: 'accent' | 'warn';
+}) {
+  const color =
+    tone === 'accent'
+      ? value > 0
+        ? 'text-accent'
+        : 'text-fg-3'
+      : tone === 'warn'
+        ? value > 0
+          ? 'text-warn'
+          : 'text-fg-3'
+        : value > 0
+          ? 'text-fg'
+          : 'text-fg-3';
+  return (
+    <div className="rounded-md border border-hairline bg-sheen/[0.02] px-2 py-1.5">
+      <span className="block text-[10px] uppercase tracking-wider text-fg-3">{label}</span>
+      <span className={['mt-0.5 block font-mono text-[15px] tnum', color].join(' ')}>
+        {value}
+        {typeof total === 'number' && total !== value ? (
+          <span className="ml-0.5 text-[10px] text-fg-3">/{total}</span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
 function ConnectRepoDialog({
   onClose,
   onConnected,

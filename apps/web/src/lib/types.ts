@@ -91,6 +91,15 @@ export interface RepoSummary {
   htmlUrl: string;
 }
 
+export interface ProjectStats {
+  tasksOpen: number;
+  tasksTotal: number;
+  tasksReview: number;
+  runningPreviews: number;
+  commits7d: number;
+  lastCommitAt: string | null;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -101,6 +110,7 @@ export interface Project {
   visibility: 'public' | 'private' | 'internal';
   description: string | null;
   createdAt: string;
+  stats?: ProjectStats | null;
 }
 
 export interface ProjectDetail extends Project {
