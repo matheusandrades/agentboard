@@ -7,9 +7,12 @@ import { logger } from './logger.js';
 import { registerHttpRoutes } from './api/http.js';
 import { registerHelloRoute } from './api/hello.js';
 import { registerWsRoutes } from './api/ws.js';
+import { registerAuthRoutes } from './api/auth.js';
+import { registerAuth, needsSetupGate, requireSession } from './auth/middleware.js';
 import { startDispatcher } from './agents/dispatcher.js';
 import { startNotificationDispatcher } from './notifications/dispatcher.js';
 import { ensureDispatchGroup } from './redis/streams.js';
+import { purgeExpiredSessions } from './auth/sessions.js';
 import { closeDb } from './db/client.js';
 import { closeRedis } from './redis/client.js';
 
@@ -35,6 +38,13 @@ async function buildApp() {
 
   await app.register(websocket);
 
+  // Auth must be registered BEFORE routes so the `req.user` decoration
+  // and the needsSetup gate apply to every handler.
+  await registerAuth(app);
+  app.addHook('preHandler', needsSetupGate);
+  app.addHook('preHandler', requireSession);
+
+  await registerAuthRoutes(app);
   await registerHttpRoutes(app);
   await registerHelloRoute(app);
   await registerWsRoutes(app);

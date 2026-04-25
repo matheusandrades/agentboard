@@ -42,6 +42,7 @@ It is not a chatbot. It is a small autonomous engineering organisation you can i
 | **Commits** (`/commits`) | All commits with diff viewer, grouped by day, filterable per agent |
 | **Usage** (`/usage`) | Token usage per agent / model / day — same data Claude Code's `/usage` shows. In API-key mode it also shows USD. |
 | **Timeline** (`/timeline`) | Wire feed of every event — thoughts, tool calls, commits, status changes |
+| **Users** (`/users`, admin) | Invite, disable, delete operators; reset their passwords; manage roles |
 | **Settings** (`/settings`) | GitHub auth, Slack/Discord webhooks, theme |
 
 Power users:
@@ -88,7 +89,30 @@ The script:
 
 When it finishes, open **http://localhost:5173**.
 
-### Authentication
+### First-run install wizard
+
+The first time you open AgentBoard you'll be greeted by an install
+wizard that creates the **administrator account** (email, username,
+password — stored hashed with scrypt in your local Postgres).
+
+After signing in, open the account menu in the top-right corner:
+
+- **Manage users** (admin only) — invite teammates as `admin` or
+  `member`. `admin` can manage users, settings, approvals, and run
+  destructive actions; `member` can do everything else (chat, create
+  tasks, edit personas + rules, ship work).
+- **Change password** — rotates the password and signs you out of every
+  other browser.
+
+Sessions are stored server-side in the `sessions` table; revoking is just
+a row delete. Disabling or deleting a user kills all their sessions
+immediately. The system refuses to let you remove the last active admin.
+
+> **Production note:** AgentBoard sets the cookie as `Secure` only when
+> `NODE_ENV=production`. Always serve the orchestrator + web behind HTTPS
+> in real deployments.
+
+### Anthropic authentication
 
 AgentBoard supports two ways for the agents to talk to Anthropic:
 

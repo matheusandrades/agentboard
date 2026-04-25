@@ -12,6 +12,45 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 
+/* ------------------------------ users -------------------------------
+ * Operators of the platform — the humans who log in. NOT the AI agents.
+ * Only `admin` can manage users, settings, and destructive operations.
+ * `member` can run the team (chat, create tasks, edit personas + rules,
+ * approve, etc). Add `viewer` later if a read-only role is needed.
+ */
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  username: varchar('username', { length: 100 }).notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  role: varchar('role', { length: 20 }).notNull().default('member'),
+  isDisabled: boolean('is_disabled').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+});
+export type UserRow = InferSelectModel<typeof users>;
+export type NewUserRow = InferInsertModel<typeof users>;
+
+/* ----------------------------- sessions -----------------------------
+ * Server-side session store. The cookie carries the session id; this
+ * table holds the truth, so revoking is just a row delete.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: text('id').primaryKey(), // random 32-byte token, base64url
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    userAgent: text('user_agent'),
+    ipAddress: varchar('ip_address', { length: 64 }),
+  },
+  (t) => ({ byUser: index('sessions_user_id_idx').on(t.userId) }),
+);
+export type SessionRow = InferSelectModel<typeof sessions>;
+
 /* ------------------------------ agents ------------------------------ */
 export const agents = pgTable('agents', {
   id: uuid('id').defaultRandom().primaryKey(),

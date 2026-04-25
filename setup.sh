@@ -89,6 +89,13 @@ cat <<'EOF'
 ──────────────────────────────────────────────────────────
   AgentBoard is up.
 
+  Next step: open  http://localhost:5173  in your browser.
+
+  You'll be greeted by the install wizard — pick an email,
+  username, and password for the first administrator account.
+  After that, sign in and use the "Manage users" item in the
+  top-right account menu to invite teammates (admin or member).
+
   • Web:           http://localhost:5173
   • Orchestrator:  http://localhost:3001/api/health
   • Logs:          pnpm logs

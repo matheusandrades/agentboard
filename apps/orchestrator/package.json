@@ -19,6 +19,7 @@
   "dependencies": {
     "@agentboard/shared": "workspace:*",
     "@anthropic-ai/claude-agent-sdk": "latest",
+    "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.0.1",
     "@fastify/websocket": "^11.0.1",
     "dotenv": "^16.4.5",

@@ -57,6 +57,8 @@ async function request<T>(
   const { body, query, accept = 'json' } = options;
   const res = await fetch(buildUrl(path, query), {
     method,
+    // Send the auth session cookie cross-origin (orchestrator on :3001 vs web on :5173).
+    credentials: 'include',
     headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -229,3 +231,39 @@ export const taskReplay = (id: string) =>
 
 // ---------- Meta ----------
 export const health = () => request<{ status: string }>('GET', '/health');
+
+// ---------- Auth ----------
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  role: 'admin' | 'member';
+  isDisabled?: boolean;
+  createdAt?: string;
+  lastLoginAt?: string | null;
+}
+export const setupStatus = () => request<{ needsSetup: boolean }>('GET', '/api/setup/status');
+export const setupAdmin = (body: { email: string; username: string; password: string }) =>
+  request<AuthUser>('POST', '/api/setup', { body });
+export const login = (body: { identifier: string; password: string }) =>
+  request<AuthUser>('POST', '/api/auth/login', { body });
+export const logout = () => request<{ ok: true }>('POST', '/api/auth/logout');
+export const me = () => request<AuthUser>('GET', '/api/auth/me');
+export const changePassword = (body: { currentPassword: string; newPassword: string }) =>
+  request<{ ok: true }>('POST', '/api/auth/password', { body });
+
+// ---------- Users (admin) ----------
+export const listUsers = () => request<AuthUser[]>('GET', '/api/users');
+export const createUser = (body: {
+  email: string;
+  username: string;
+  password: string;
+  role?: 'admin' | 'member';
+}) => request<AuthUser>('POST', '/api/users', { body });
+export const updateUser = (
+  id: string,
+  body: { role?: 'admin' | 'member'; isDisabled?: boolean },
+) => request<AuthUser>('PATCH', `/api/users/${id}`, { body });
+export const deleteUser = (id: string) => request<void>('DELETE', `/api/users/${id}`);
+export const resetUserPassword = (id: string, newPassword: string) =>
+  request<{ ok: true }>('POST', `/api/users/${id}/password`, { body: { newPassword } });

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useBoardStore } from '@/lib/store';
 import { getInitialTheme, toggleTheme, type ThemeMode } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
+import * as api from '@/lib/api';
 import { ChatLauncher } from './ChatLauncher';
 import { CommandPalette } from './CommandPalette';
 import type { AgentStatus } from '@/lib/types';
@@ -160,6 +162,7 @@ export function Layout() {
                 </svg>
               )}
             </button>
+            <UserMenu />
           </div>
         </header>
 
@@ -449,5 +452,197 @@ function SprintIcon({ className }: IconProps) {
       <circle cx="12" cy="12" r="8" />
       <path d="M12 8v4l3 2" />
     </svg>
+  );
+}
+
+/* ────────────────────────── User menu ─────────────────────────── */
+function UserMenu() {
+  const user = useAuth((s) => s.user);
+  const logout = useAuth((s) => s.logout);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  if (!user) return null;
+  const initial = user.username.charAt(0).toUpperCase();
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 rounded-full border border-hairline bg-sheen/[0.03] py-1 pl-1 pr-3 text-[12px] transition hover:border-hairline-strong"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-accent/80 font-medium text-canvas">
+          {initial}
+        </span>
+        <span className="hidden md:inline text-fg">{user.username}</span>
+        <span className="hidden md:inline text-fg-3">·</span>
+        <span className="hidden md:inline text-fg-3">{user.role}</span>
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className="absolute right-0 top-[calc(100%+6px)] z-50 w-56 overflow-hidden rounded-xl border border-hairline bg-canvas-raised shadow-2xl"
+        >
+          <div className="border-b border-hairline px-3 py-2.5">
+            <div className="text-[12.5px] font-medium text-fg">{user.username}</div>
+            <div className="truncate text-[11px] text-fg-3">{user.email}</div>
+            <div className="mt-1 text-[10px] uppercase tracking-wider text-fg-3">{user.role}</div>
+          </div>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
+            onClick={() => {
+              setOpen(false);
+              setShowPwd(true);
+            }}
+          >
+            Change password
+          </button>
+          {user.role === 'admin' ? (
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
+              onClick={() => {
+                setOpen(false);
+                navigate('/users');
+              }}
+            >
+              Manage users
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="block w-full border-t border-hairline px-3 py-2 text-left text-[12.5px] text-err hover:bg-err-soft"
+            onClick={async () => {
+              setOpen(false);
+              await logout();
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      ) : null}
+      {showPwd ? <ChangePasswordDialog onClose={() => setShowPwd(false)} /> : null}
+    </div>
+  );
+}
+
+function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const ok = current.length >= 1 && next.length >= 8 && next === confirm;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ok || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await api.changePassword({ currentPassword: current, newPassword: next });
+      setDone(true);
+      setTimeout(onClose, 1200);
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      setErr(
+        status === 401
+          ? 'Current password is wrong.'
+          : e instanceof Error
+            ? e.message
+            : 'Change failed',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-2xl border border-hairline bg-canvas-raised p-6"
+      >
+        <h2 className="text-[16px] font-medium text-fg">Change password</h2>
+        <p className="mt-1 text-[12px] text-fg-2">
+          We'll sign you out of every other browser after the change.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="block">
+            <span className="eyebrow mb-1 block">Current password</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              className="input w-full"
+              required
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="eyebrow mb-1 block">New password</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="input w-full"
+              required
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="eyebrow mb-1 block">Confirm new password</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              className="input w-full"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+            {confirm && confirm !== next ? (
+              <p className="mt-1 text-[11px] text-err">Passwords don't match.</p>
+            ) : null}
+          </label>
+        </div>
+        {err ? (
+          <div className="mt-3 rounded-lg border border-err/40 bg-err-soft px-3 py-2 text-[12px] text-err">
+            {err}
+          </div>
+        ) : null}
+        {done ? (
+          <p className="mt-3 text-[12px] text-ok">Updated. Closing…</p>
+        ) : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" className="btn-ghost btn-sm" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-sm" disabled={!ok || busy}>
+            {busy ? 'Updating…' : 'Update password'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

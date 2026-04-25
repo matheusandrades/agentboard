@@ -5,6 +5,65 @@ and the project tracks [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-04-25
+
+Authentication, RBAC, and a first-run install wizard. Until now anyone
+who could reach the orchestrator could drive the agents — this release
+puts the platform behind a login.
+
+### Added
+
+#### Authentication + roles
+- `users` table (email, username, scrypt password hash, role,
+  is_disabled, last_login_at) and server-side `sessions` table with a
+  30-day TTL.
+- Two roles out of the box: `admin` (manage users, settings, destructive
+  ops) and `member` (run the team, edit personas + rules, ship work).
+- Cookie-based sessions via `@fastify/cookie`. The cookie carries an
+  opaque random token; truth lives in the `sessions` table so revoking
+  is just a row delete. `Secure` flag flips on in production.
+- Login throttle (10 wrong attempts / 15 min triggers a 1-minute
+  cool-off) — per identifier + IP, in-memory.
+- Audit log captures `user.created`, `user.login`, `user.password_changed`,
+  `user.password_reset`, `user.updated`, `user.deleted`.
+- "Last admin" guard refuses to demote / disable / delete the only
+  active admin.
+
+#### First-run install wizard
+- New `/api/setup/status` returns `{ needsSetup: boolean }`. While true,
+  every protected route returns `503 needsSetup`.
+- `/api/setup` (one-shot, only callable while uninitialised) creates the
+  initial admin and signs them in.
+- The web app shows a full-screen `<SetupWizard>` on first visit.
+
+#### Endpoints
+- `POST /api/auth/login` — email or username + password, sets cookie.
+- `POST /api/auth/logout` — clears cookie + drops session row.
+- `GET  /api/auth/me`    — current user or 401.
+- `POST /api/auth/password` — change own password (invalidates other
+  sessions).
+- `GET  /api/users`, `POST /api/users`, `PATCH /api/users/:id`,
+  `DELETE /api/users/:id`, `POST /api/users/:id/password` — admin only.
+
+#### Frontend
+- Zustand `useAuth` store with explicit phases
+  (`loading | needs-setup | logged-out | logged-in`).
+- `<AuthGate>` wraps the router and renders splash / wizard / login /
+  app based on phase.
+- `<UserMenu>` in the top bar with the user's email + role, change-
+  password dialog, "Manage users" shortcut for admins, sign out.
+- `/users` page — list, invite, role change, enable/disable, password
+  reset, delete; mirrors the backend's last-admin guards client-side.
+- WebSocket `/ws` does its own handshake auth and closes 4401 on
+  unauthenticated connections.
+- `lib/api.ts` now sends `credentials: 'include'` so cookies travel
+  cross-origin between the web (5173) and the orchestrator (3001).
+
+### Documentation
+- README gained a **First-run install wizard** section under Quick start
+  and a **Users** entry in the surfaces table.
+- `setup.sh` final banner now tells the operator to open the wizard.
+
 ## [0.1.0] — 2026-04-25
 
 First public release. The core team-of-agents loop runs end-to-end against
@@ -101,5 +160,6 @@ real GitHub repos.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, MIT `LICENSE`.
 - `.github/` issue templates, PR template, CI (typecheck + tests).
 
-[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.1.0
