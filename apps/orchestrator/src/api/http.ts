@@ -37,6 +37,7 @@ import {
   exchangeOauthCode,
   getGithubStatus,
   getIssue,
+  listAccounts,
   listIssues,
   listProjectBranches,
   listPullRequests,
@@ -1429,11 +1430,21 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/api/github/repos', async (req, reply) => {
-    const q = (req.query ?? {}) as { limit?: string };
+    const q = (req.query ?? {}) as { limit?: string; owner?: string };
     const limit = q.limit ? Math.min(200, Math.max(1, Number(q.limit))) : 100;
     try {
-      const repos = await listRepos({ limit });
+      const repos = await listRepos({ limit, owner: q.owner });
       return repos;
+    } catch (err) {
+      return sendError(reply, 502, 'github_failed', (err as Error).message);
+    }
+  });
+
+  // GitHub accounts the operator can see: own user + orgs (OAuth/PAT)
+  // or each App installation account.
+  app.get('/api/github/accounts', async (_req, reply) => {
+    try {
+      return await listAccounts();
     } catch (err) {
       return sendError(reply, 502, 'github_failed', (err as Error).message);
     }

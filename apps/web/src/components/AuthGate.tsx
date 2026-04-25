@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { SetupWizard } from './SetupWizard';
+import { PostSetupWizard } from './PostSetupWizard';
 import { LoginPage } from './LoginPage';
 
 /**
@@ -12,6 +13,7 @@ import { LoginPage } from './LoginPage';
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const phase = useAuth((s) => s.phase);
+  const postSetupPending = useAuth((s) => s.postSetupPending);
   const bootstrap = useAuth((s) => s.bootstrap);
 
   useEffect(() => {
@@ -31,5 +33,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (phase === 'needs-setup') return <SetupWizard />;
   if (phase === 'logged-out') return <LoginPage />;
+  if (postSetupPending) return <PostSetupWizard />;
   return <>{children}</>;
 }

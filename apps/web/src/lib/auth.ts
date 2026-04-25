@@ -6,19 +6,29 @@ export type AuthPhase = 'loading' | 'needs-setup' | 'logged-out' | 'logged-in';
 interface AuthState {
   phase: AuthPhase;
   user: api.AuthUser | null;
+  /**
+   * Set right after the install wizard creates the first admin. Tells
+   * AuthGate to keep rendering the wizard's "post-setup" steps (GitHub
+   * connect, etc.) before handing control to the main app routes.
+   * Cleared by `dismissPostSetup()`.
+   */
+  postSetupPending: boolean;
   /** Bootstrap: ask the server who we are. Runs on first mount. */
   bootstrap: () => Promise<void>;
   setupAdmin: (input: { email: string; username: string; password: string }) => Promise<void>;
   login: (identifier: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (u: api.AuthUser | null) => void;
+  dismissPostSetup: () => void;
 }
 
 export const useAuth = create<AuthState>((set) => ({
   phase: 'loading',
   user: null,
+  postSetupPending: false,
 
   setUser: (u) => set({ user: u, phase: u ? 'logged-in' : 'logged-out' }),
+  dismissPostSetup: () => set({ postSetupPending: false }),
 
   async bootstrap() {
     try {
@@ -48,7 +58,7 @@ export const useAuth = create<AuthState>((set) => ({
 
   async setupAdmin(input) {
     const user = await api.setupAdmin(input);
-    set({ user, phase: 'logged-in' });
+    set({ user, phase: 'logged-in', postSetupPending: true });
   },
 
   async login(identifier, password) {

@@ -168,8 +168,20 @@ export const githubStatus = () => request<GithubStatus>('GET', '/api/github/stat
 export const githubConnect = (token: string) =>
   request<GithubStatus>('POST', '/api/github/connect', { body: { token } });
 export const githubDisconnect = () => request<void>('DELETE', '/api/github/connect');
-export const githubRepos = (limit = 100) =>
-  request<RepoSummary[]>('GET', '/api/github/repos', { query: { limit } });
+export const githubRepos = (opts: { limit?: number; owner?: string } = {}) =>
+  request<RepoSummary[]>('GET', '/api/github/repos', {
+    query: { limit: opts.limit ?? 100, owner: opts.owner },
+  });
+
+export interface GithubAccount {
+  login: string;
+  name: string | null;
+  description: string | null;
+  avatarUrl: string;
+  htmlUrl: string;
+  isUser?: boolean;
+}
+export const githubAccounts = () => request<GithubAccount[]>('GET', '/api/github/accounts');
 
 // OAuth App flow. `oauthConfig` tells the UI whether the operator
 // configured the env vars; `oauthStart` returns the URL the browser

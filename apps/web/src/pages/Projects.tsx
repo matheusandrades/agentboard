@@ -180,6 +180,8 @@ function ConnectRepoDialog({
   setQuery: (s: string) => void;
 }) {
   const [repos, setRepos] = useState<RepoSummary[]>([]);
+  const [accounts, setAccounts] = useState<api.GithubAccount[]>([]);
+  const [owner, setOwner] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -187,8 +189,12 @@ function ConnectRepoDialog({
   useEffect(() => {
     void (async () => {
       try {
-        const rs = await api.githubRepos(200);
+        const [rs, accs] = await Promise.all([
+          api.githubRepos({ limit: 200 }),
+          api.githubAccounts().catch(() => [] as api.GithubAccount[]),
+        ]);
         setRepos(rs);
+        setAccounts(accs);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to list repos');
       } finally {
@@ -207,12 +213,16 @@ function ConnectRepoDialog({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return repos;
-    return repos.filter(
-      (r) =>
-        r.fullName.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q),
-    );
-  }, [repos, query]);
+    let xs = repos;
+    if (owner) xs = xs.filter((r) => r.owner === owner);
+    if (q) {
+      xs = xs.filter(
+        (r) =>
+          r.fullName.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q),
+      );
+    }
+    return xs;
+  }, [repos, query, owner]);
 
   async function connect(r: RepoSummary) {
     if (connecting) return;
@@ -263,12 +273,28 @@ function ConnectRepoDialog({
           </p>
           <div className="mt-4 flex items-center gap-2">
             <input
-              className="input"
-              placeholder="Filter by owner, name, description…"
+              className="input flex-1"
+              placeholder="Filter by name, description…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
             />
+            {accounts.length > 1 ? (
+              <select
+                className="input w-44"
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+                title="Filter by owner / org"
+              >
+                <option value="">All accounts</option>
+                {accounts.map((a) => (
+                  <option key={a.login} value={a.login}>
+                    {a.login}
+                    {a.isUser ? ' (you)' : ''}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </div>
         </header>
 

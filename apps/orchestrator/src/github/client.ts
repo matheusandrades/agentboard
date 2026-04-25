@@ -193,6 +193,125 @@ export async function disconnectOauth(): Promise<void> {
   await db.delete(githubConnections).where(eq(githubConnections.mode, 'oauth'));
 }
 
+/* ----------------------- organizations / accounts ------------------- */
+
+export interface OrgSummary {
+  login: string;
+  name: string | null;
+  description: string | null;
+  avatarUrl: string;
+  htmlUrl: string;
+  /** When listing the user's own login alongside orgs, mark it. */
+  isUser?: boolean;
+}
+
+/**
+ * List the GitHub accounts (user + orgs) the active connection can see.
+ * For OAuth/PAT we hit /user and /user/orgs. For App we surface each
+ * installation's account.
+ */
+export async function listAccounts(): Promise<OrgSummary[]> {
+  const active = await pickActiveConnection();
+  if (!active) return [];
+
+  // App mode: each installation = one account.
+  if (active.mode === 'app' && active.installationId) {
+    try {
+      const { getActiveAppSettings, signAppJwt } = await import('./app.js');
+      const app = await getActiveAppSettings();
+      if (!app) return [];
+      const appJwt = signAppJwt(app.appId, app.privateKey);
+      const res = await fetch('https://api.github.com/app/installations', {
+        headers: {
+          Authorization: `Bearer ${appJwt}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'AgentBoard',
+        },
+      });
+      if (!res.ok) return [];
+      const arr = (await res.json()) as Array<{
+        id: number;
+        account: {
+          login: string;
+          name?: string | null;
+          description?: string | null;
+          avatar_url: string;
+          html_url: string;
+          type?: string;
+        } | null;
+      }>;
+      const out: OrgSummary[] = [];
+      for (const row of arr) {
+        if (!row.account) continue;
+        out.push({
+          login: row.account.login,
+          name: row.account.name ?? null,
+          description: row.account.description ?? null,
+          avatarUrl: row.account.avatar_url,
+          htmlUrl: row.account.html_url,
+          isUser: row.account.type === 'User',
+        });
+      }
+      return out;
+    } catch (err) {
+      logger.warn({ err }, 'listAccounts(app) failed');
+      return [];
+    }
+  }
+
+  if (!active.accessToken) return [];
+  const headers = {
+    Authorization: `Bearer ${active.accessToken}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'AgentBoard',
+  };
+  try {
+    const [me, orgs] = await Promise.all([
+      fetch('https://api.github.com/user', { headers }).then(
+        (r): Promise<{
+          login: string;
+          name: string | null;
+          bio: string | null;
+          avatar_url: string;
+          html_url: string;
+        }> => r.json(),
+      ),
+      fetch('https://api.github.com/user/orgs?per_page=100', { headers }).then(
+        (r): Promise<Array<{
+          login: string;
+          description: string | null;
+          avatar_url: string;
+          html_url: string;
+        }>> => r.json(),
+      ),
+    ]);
+    const out: OrgSummary[] = [];
+    if (me?.login) {
+      out.push({
+        login: me.login,
+        name: me.name,
+        description: me.bio,
+        avatarUrl: me.avatar_url,
+        htmlUrl: me.html_url,
+        isUser: true,
+      });
+    }
+    for (const o of orgs) {
+      out.push({
+        login: o.login,
+        name: null,
+        description: o.description,
+        avatarUrl: o.avatar_url,
+        htmlUrl: o.html_url,
+      });
+    }
+    return out;
+  } catch (err) {
+    logger.warn({ err }, 'listAccounts failed');
+    return [];
+  }
+}
+
 async function upsertGhConnection(login: string, scopes: string): Promise<void> {
   const [existing] = await db
     .select()
@@ -292,10 +411,62 @@ export interface RepoSummary {
  * List repositories the user has access to. Uses `gh` CLI (richer — covers
  * orgs, fine-grained perms) when available, falling back to REST via PAT.
  */
-export async function listRepos(opts: { limit?: number } = {}): Promise<RepoSummary[]> {
+export async function listRepos(
+  opts: { limit?: number; owner?: string } = {},
+): Promise<RepoSummary[]> {
   const limit = opts.limit ?? 100;
   const status = await getGithubStatus();
   if (!status.connected) return [];
+
+  // App mode: list repos visible to the active installation.
+  if (status.mode === 'app') {
+    const active = await pickActiveConnection();
+    if (active?.installationId) {
+      try {
+        const { getInstallationToken } = await import('./app.js');
+        const token = await getInstallationToken(active.installationId);
+        const res = await fetch(
+          `https://api.github.com/installation/repositories?per_page=${limit}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/vnd.github+json',
+              'User-Agent': 'AgentBoard',
+            },
+          },
+        );
+        if (res.ok) {
+          const j = (await res.json()) as {
+            repositories: Array<{
+              owner: { login: string };
+              name: string;
+              full_name: string;
+              description: string | null;
+              default_branch: string;
+              visibility: string;
+              pushed_at: string | null;
+              html_url: string;
+            }>;
+          };
+          let arr = j.repositories;
+          if (opts.owner) arr = arr.filter((r) => r.owner.login === opts.owner);
+          return arr.map((r) => ({
+            owner: r.owner.login,
+            name: r.name,
+            fullName: r.full_name,
+            description: r.description,
+            defaultBranch: r.default_branch,
+            visibility:
+              (r.visibility?.toLowerCase() as RepoSummary['visibility']) ?? 'private',
+            pushedAt: r.pushed_at,
+            htmlUrl: r.html_url,
+          }));
+        }
+      } catch (err) {
+        logger.warn({ err }, 'App listRepos failed, falling back');
+      }
+    }
+  }
 
   if (status.mode === 'gh') {
     try {
