@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useBoardStore } from '@/lib/store';
 import { getInitialTheme, toggleTheme, type ThemeMode } from '@/lib/theme';
@@ -455,30 +456,63 @@ function SprintIcon({ className }: IconProps) {
   );
 }
 
-/* ────────────────────────── User menu ─────────────────────────── */
+/* ────────────────────────── User menu ───────────────────────────
+ * Trigger lives in the header; the dropdown is portalled to <body> so
+ * it's never trapped under sibling stacking contexts (the header's
+ * backdrop-blur was clipping it on /dashboard).
+ */
 function UserMenu() {
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const update = () => {
+      if (!triggerRef.current) return;
+      const r = triggerRef.current.getBoundingClientRect();
+      setPos({ top: Math.round(r.bottom + 6), right: Math.round(window.innerWidth - r.right) });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
     };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   if (!user) return null;
   const initial = user.username.charAt(0).toUpperCase();
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="inline-flex items-center gap-2 rounded-full border border-hairline bg-sheen/[0.03] py-1 pl-1 pr-3 text-[12px] transition hover:border-hairline-strong"
@@ -492,52 +526,61 @@ function UserMenu() {
         <span className="hidden md:inline text-fg-3">·</span>
         <span className="hidden md:inline text-fg-3">{user.role}</span>
       </button>
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-[calc(100%+6px)] z-50 w-56 overflow-hidden rounded-xl border border-hairline bg-canvas-raised shadow-2xl"
-        >
-          <div className="border-b border-hairline px-3 py-2.5">
-            <div className="text-[12.5px] font-medium text-fg">{user.username}</div>
-            <div className="truncate text-[11px] text-fg-3">{user.email}</div>
-            <div className="mt-1 text-[10px] uppercase tracking-wider text-fg-3">{user.role}</div>
-          </div>
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
-            onClick={() => {
-              setOpen(false);
-              setShowPwd(true);
-            }}
-          >
-            Change password
-          </button>
-          {user.role === 'admin' ? (
-            <button
-              type="button"
-              className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
-              onClick={() => {
-                setOpen(false);
-                navigate('/users');
-              }}
+
+      {open && pos
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 80 }}
+              className="w-56 overflow-hidden rounded-xl border border-hairline bg-canvas-raised shadow-2xl"
             >
-              Manage users
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="block w-full border-t border-hairline px-3 py-2 text-left text-[12.5px] text-err hover:bg-err-soft"
-            onClick={async () => {
-              setOpen(false);
-              await logout();
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      ) : null}
+              <div className="border-b border-hairline px-3 py-2.5">
+                <div className="text-[12.5px] font-medium text-fg">{user.username}</div>
+                <div className="truncate text-[11px] text-fg-3">{user.email}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-wider text-fg-3">
+                  {user.role}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
+                onClick={() => {
+                  setOpen(false);
+                  setShowPwd(true);
+                }}
+              >
+                Change password
+              </button>
+              {user.role === 'admin' ? (
+                <button
+                  type="button"
+                  className="block w-full px-3 py-2 text-left text-[12.5px] text-fg-2 hover:bg-sheen/[0.05] hover:text-fg"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/users');
+                  }}
+                >
+                  Manage users
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="block w-full border-t border-hairline px-3 py-2 text-left text-[12.5px] text-err hover:bg-err-soft"
+                onClick={async () => {
+                  setOpen(false);
+                  await logout();
+                }}
+              >
+                Sign out
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
+
       {showPwd ? <ChangePasswordDialog onClose={() => setShowPwd(false)} /> : null}
-    </div>
+    </>
   );
 }
 
