@@ -5,6 +5,24 @@ and the project tracks [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-04-25
+
+### Changed
+- Sidebar: 'Settings' moved into the top-right user menu so the
+  bottom nav item never gets pushed off-screen on shorter viewports.
+  Nav buttons tightened (smaller gap + padding).
+- Settings → GitHub: the section now always shows all three connection
+  methods (App / OAuth / PAT) even when one is already active, so
+  operators can switch (e.g. App → OAuth) in one click. Each card
+  reports its state (active / available / not configured) with the
+  matching action.
+- The OAuth card explicitly hints to use OAuth when an organization
+  isn't reachable through the GitHub App installation.
+
+### Fixed
+- Sidebar footer was scrolling away when the nav grew taller than the
+  viewport. Footer is now pinned, items stay visible without scroll.
+
 ## [0.4.1] — 2026-04-25
 
 ### Added
@@ -327,7 +345,8 @@ real GitHub repos.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, MIT `LICENSE`.
 - `.github/` issue templates, PR template, CI (typecheck + tests).
 
-[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/matheusandrades/agentboard/releases/tag/v0.4.2
 [0.4.1]: https://github.com/matheusandrades/agentboard/releases/tag/v0.4.1
 [0.4.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.4.0
 [0.3.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.3.0
