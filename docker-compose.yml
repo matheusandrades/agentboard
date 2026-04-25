@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agentboard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentboard
+      POSTGRES_PASSWORD: agentboard
+      POSTGRES_DB: agentboard
+    ports:
+      - "55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentboard -d agentboard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentboard-redis
+    restart: unless-stopped
+    ports:
+      - "56379:6379"
+    volumes:
+      - redisdata:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  orchestrator:
+    profiles: ["prod"]
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    container_name: agentboard-orchestrator
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://agentboard:agentboard@postgres:5432/agentboard
+      REDIS_URL: redis://redis:6379
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ORCHESTRATOR_PORT: 3001
+      WORKSPACE_ROOT: /workspace
+    volumes:
+      - workspace:/workspace
+    ports:
+      - "3001:3001"
+
+  web:
+    profiles: ["prod"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: agentboard-web
+    restart: unless-stopped
+    depends_on:
+      - orchestrator
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:
+  redisdata:
+  workspace:

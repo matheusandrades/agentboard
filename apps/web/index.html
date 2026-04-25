@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#ff6e00" />
+    <meta name="description" content="AgentBoard — a Scrum/Kanban board where each team member is a long-lived Claude Agent SDK session collaborating on real engineering work." />
+    <title>AgentBoard</title>
+    <script>
+      // Apply saved theme before React mounts to avoid FOUC.
+      try {
+        var t = localStorage.getItem('agentboard.theme');
+        if (!t) t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        if (t === 'dark') document.documentElement.classList.add('dark');
+        document.documentElement.dataset.theme = t;
+      } catch (_) {}
+    </script>
+  </head>
+  <body class="antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
