@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useBoardStore } from '@/lib/store';
 import * as api from '@/lib/api';
 import { MessageBubble } from './MessageBubble';
+import { MentionTextarea } from './MentionTextarea';
 import type { MessageType, Project } from '@/lib/types';
 
 type ChatMessageType = Extract<MessageType, 'assignment' | 'question' | 'broadcast'>;
@@ -286,12 +287,12 @@ function ChatModal({ onClose, agents, stakeholderMessages, onSent }: ModalProps)
               </div>
             ) : null}
 
-            <textarea
+            <MentionTextarea
               className="textarea min-h-[140px]"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={onContentKeyDown}
-              placeholder="What do you want them to do? (⌘/Ctrl+Enter to send)"
+              placeholder="What do you want them to do? Type @ to mention a teammate, # to reference a task. (⌘/Ctrl+Enter to send)"
             />
 
             {error ? (

@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useBoardStore } from '@/lib/store';
 import { MessageBubble } from '@/components/MessageBubble';
+import { MentionTextarea } from '@/components/MentionTextarea';
 import * as api from '@/lib/api';
 import type { MessageType } from '@/lib/types';
 
@@ -128,11 +129,11 @@ export function Chat() {
 
           <label className="flex flex-col gap-1.5">
             <span className="eyebrow">Message</span>
-            <textarea
+            <MentionTextarea
               className="textarea min-h-[180px]"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="What do you want them to do?"
+              placeholder="What do you want them to do? Tip: type @ to mention a teammate, # to reference a task."
             />
           </label>
 

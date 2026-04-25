@@ -217,6 +217,19 @@ export const importIssue = (id: string, number: number, assigneeId?: string | nu
     body: { assigneeId },
   });
 
+// ---------- Mentions ----------
+export interface MentionCandidate {
+  type: 'agent' | 'task' | 'commit';
+  token: string;
+  label: string;
+  subtitle?: string;
+  refId?: string;
+}
+export const searchMentions = (query: string, opts: { types?: string; projectId?: string } = {}) =>
+  request<MentionCandidate[]>('GET', '/api/mentions/search', {
+    query: { q: query, types: opts.types, projectId: opts.projectId },
+  });
+
 // ---------- Files ----------
 export interface TreeEntry {
   name: string;
