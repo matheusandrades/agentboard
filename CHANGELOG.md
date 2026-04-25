@@ -5,6 +5,24 @@ and the project tracks [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-04-25
+
+### Added
+- /orgs page: lists every GitHub account the active connection can
+  reach (user + orgs for OAuth/PAT, one card per App installation),
+  with each card showing avatar, login, type, repo-connected count.
+  'Browse' jumps to /projects filtered by that owner.
+- Sidebar gains 'Orgs' under Code.
+
+### Changed
+- /projects cards now carry a 3-stat strip per project: tasks in
+  flight, tasks in review, commits in the last 7 days. Last-commit
+  time replaces 'connected at' in the footer when available.
+- GET /api/projects returns the stats blob inline (one DB pass, no
+  per-card requests).
+- /projects honours `?owner=<login>` with a filter banner + clear
+  button so /orgs deep-links work.
+
 ## [0.4.0] — 2026-04-25
 
 Big GitHub + DX release. The install flow now ends with a 1-click
@@ -309,7 +327,8 @@ real GitHub repos.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, MIT `LICENSE`.
 - `.github/` issue templates, PR template, CI (typecheck + tests).
 
-[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/matheusandrades/agentboard/releases/tag/v0.4.1
 [0.4.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.4.0
 [0.3.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.2.0
