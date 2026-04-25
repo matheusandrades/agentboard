@@ -39,6 +39,23 @@ const EnvSchema = z.object({
 
   VITE_WEB_URL: z.string().default('http://localhost:5173'),
 
+  // GitHub OAuth App — register one at https://github.com/settings/applications/new
+  // The redirect URL in the app config must match GITHUB_OAUTH_REDIRECT_URL.
+  GITHUB_OAUTH_CLIENT_ID: z.string().optional(),
+  GITHUB_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GITHUB_OAUTH_REDIRECT_URL: z
+    .string()
+    .default('http://localhost:3001/api/github/oauth/callback'),
+
+  // GitHub App (optional, for finer-grained per-repo install). When unset
+  // we expose the OAuth flow + PAT only.
+  GITHUB_APP_ID: z.string().optional(),
+  GITHUB_APP_CLIENT_ID: z.string().optional(),
+  GITHUB_APP_CLIENT_SECRET: z.string().optional(),
+  GITHUB_APP_PRIVATE_KEY: z.string().optional(),
+  GITHUB_APP_NAME: z.string().optional(),
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
+
   TEST_REDIS_URL: z.string().optional(),
 });
 

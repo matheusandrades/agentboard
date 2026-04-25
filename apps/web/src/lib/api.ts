@@ -171,6 +171,29 @@ export const githubDisconnect = () => request<void>('DELETE', '/api/github/conne
 export const githubRepos = (limit = 100) =>
   request<RepoSummary[]>('GET', '/api/github/repos', { query: { limit } });
 
+// OAuth App flow. `oauthConfig` tells the UI whether the operator
+// configured the env vars; `oauthStart` returns the URL the browser
+// should hop to (we open it in a popup so the user keeps their place).
+export interface GithubOauthConfig {
+  enabled: boolean;
+  source: 'db' | 'env' | null;
+  clientIdMasked: string | null;
+  defaultRedirectUrl: string;
+}
+export const githubOauthConfig = () =>
+  request<GithubOauthConfig>('GET', '/api/github/oauth/config');
+export const githubOauthStart = () =>
+  request<{ url: string }>('GET', '/api/github/oauth/start');
+export const githubOauthDisconnect = () =>
+  request<void>('DELETE', '/api/github/oauth');
+export const saveGithubOauthCreds = (body: {
+  clientId: string;
+  clientSecret: string;
+  redirectUrl?: string;
+}) => request<{ ok: true }>('PUT', '/api/github/oauth/config', { body });
+export const clearGithubOauthCreds = () =>
+  request<{ ok: true }>('DELETE', '/api/github/oauth/config');
+
 // ---------- Projects ----------
 export const listProjects = () => request<Project[]>('GET', '/api/projects');
 export const getProject = (id: string) => request<ProjectDetail>('GET', `/api/projects/${id}`);

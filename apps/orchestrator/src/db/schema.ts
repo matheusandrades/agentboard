@@ -263,12 +263,33 @@ export const notifications = pgTable('notifications', {
  * detects `gh auth status` and auto-creates a 'gh' row with the resolved
  * login so the UI can show "connected as X".
  */
+/* --------------------------- app_settings ---------------------------
+ * Tiny key/value store for "platform settings the operator edits in the
+ * UI" — OAuth client id+secret, webhook URL hint, default branch policy,
+ * etc. Each key maps to a free-form JSON blob. Reads are admin-only
+ * because some values (OAuth secret, webhook secret) are sensitive.
+ */
+export const appSettings = pgTable('app_settings', {
+  key: varchar('key', { length: 100 }).primaryKey(),
+  value: jsonb('value').$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: uuid('updated_by'),
+});
+export type AppSettingRow = InferSelectModel<typeof appSettings>;
+
 export const githubConnections = pgTable('github_connections', {
   id: uuid('id').defaultRandom().primaryKey(),
-  mode: varchar('mode', { length: 20 }).notNull(), // 'gh' | 'pat'
+  // 'gh' | 'pat' | 'oauth' | 'app' — only one row should ever live in
+  // this table; new connect calls upsert it.
+  mode: varchar('mode', { length: 20 }).notNull(),
   login: varchar('login', { length: 200 }).notNull(),
   accessToken: text('access_token'), // null when mode='gh'
+  refreshToken: text('refresh_token'), // OAuth refresh, when issued
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
   scopes: text('scopes'),
+  // For mode='app': the GitHub App installation id (used to mint
+  // installation tokens via JWT). Null for other modes.
+  installationId: integer('installation_id'),
   connectedAt: timestamp('connected_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

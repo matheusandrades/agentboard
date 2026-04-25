@@ -32,37 +32,52 @@ async function run(
  * Returns the active row (creating/updating the 'gh' row on the fly so
  * the UI can read a stable source of truth).
  */
+export type GithubMode = 'gh' | 'pat' | 'oauth' | 'app';
+
 export interface GithubStatus {
   connected: boolean;
-  mode: 'gh' | 'pat' | null;
+  mode: GithubMode | null;
   login: string | null;
   scopes: string[] | null;
   detail?: string;
 }
 
+/**
+ * Resolve the active connection. We pick the highest-fidelity mode
+ * available, in this order: oauth → pat → gh. Stops at the first row
+ * found so the operator can override `gh` by saving a PAT or OAuthing.
+ */
+async function pickActiveConnection() {
+  const rows = await db.select().from(githubConnections);
+  return (
+    rows.find((r) => r.mode === 'oauth' && r.accessToken) ??
+    rows.find((r) => r.mode === 'app' && r.accessToken) ??
+    rows.find((r) => r.mode === 'pat' && r.accessToken) ??
+    rows.find((r) => r.mode === 'gh') ??
+    null
+  );
+}
+
 export async function getGithubStatus(): Promise<GithubStatus> {
-  // Saved PAT wins if present.
-  const [pat] = await db
-    .select()
-    .from(githubConnections)
-    .where(eq(githubConnections.mode, 'pat'))
-    .limit(1);
-  if (pat?.accessToken) {
+  const active = await pickActiveConnection();
+
+  // Verify any token-bearing connection actually works against GitHub.
+  if (active?.accessToken && active.mode !== 'gh') {
     try {
-      const login = await whoAmIWithToken(pat.accessToken);
+      const login = await whoAmIWithToken(active.accessToken);
       return {
         connected: true,
-        mode: 'pat',
+        mode: active.mode as GithubMode,
         login,
-        scopes: pat.scopes ? pat.scopes.split(/[,\s]+/).filter(Boolean) : null,
+        scopes: active.scopes ? active.scopes.split(/[,\s]+/).filter(Boolean) : null,
       };
     } catch (err) {
       return {
         connected: false,
-        mode: 'pat',
-        login: pat.login,
+        mode: active.mode as GithubMode,
+        login: active.login,
         scopes: null,
-        detail: err instanceof Error ? err.message : 'PAT rejected by GitHub',
+        detail: err instanceof Error ? err.message : 'token rejected by GitHub',
       };
     }
   }
@@ -81,6 +96,87 @@ export async function getGithubStatus(): Promise<GithubStatus> {
   }
 
   return { connected: false, mode: null, login: null, scopes: null };
+}
+
+/** Returns a usable bearer token, or null when the only connection is the gh CLI. */
+export async function getActiveToken(): Promise<{ token: string; mode: GithubMode } | null> {
+  const active = await pickActiveConnection();
+  if (!active) return null;
+  if (active.mode === 'gh') return null;
+  if (!active.accessToken) return null;
+  return { token: active.accessToken, mode: active.mode as GithubMode };
+}
+
+/* ----------------------- OAuth App flow ----------------------------- */
+
+interface OauthExchangeResult {
+  accessToken: string;
+  refreshToken: string | null;
+  scope: string;
+}
+
+export async function exchangeOauthCode(
+  code: string,
+  redirectUri: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<OauthExchangeResult> {
+  const res = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`OAuth exchange failed: HTTP ${res.status}`);
+  }
+  const body = (await res.json()) as Record<string, string>;
+  if (body.error || !body.access_token) {
+    throw new Error(`OAuth exchange rejected: ${body.error_description ?? body.error ?? 'no token'}`);
+  }
+  return {
+    accessToken: body.access_token,
+    refreshToken: body.refresh_token ?? null,
+    scope: body.scope ?? '',
+  };
+}
+
+export async function saveOauthConnection(
+  accessToken: string,
+  scopes: string,
+  refreshToken: string | null,
+): Promise<GithubStatus> {
+  const login = await whoAmIWithToken(accessToken);
+  const existing = (await db.select().from(githubConnections)).find((r) => r.mode === 'oauth');
+  if (existing) {
+    await db
+      .update(githubConnections)
+      .set({ login, accessToken, scopes, refreshToken })
+      .where(eq(githubConnections.id, existing.id));
+  } else {
+    await db.insert(githubConnections).values({
+      mode: 'oauth',
+      login,
+      accessToken,
+      scopes,
+      refreshToken,
+    });
+  }
+  // Drop any older PAT/gh row so the OAuth connection wins cleanly.
+  return {
+    connected: true,
+    mode: 'oauth',
+    login,
+    scopes: scopes.split(/[,\s]+/).filter(Boolean),
+  };
+}
+
+export async function disconnectOauth(): Promise<void> {
+  await db.delete(githubConnections).where(eq(githubConnections.mode, 'oauth'));
 }
 
 async function upsertGhConnection(login: string, scopes: string): Promise<void> {
@@ -222,18 +318,14 @@ export async function listRepos(opts: { limit?: number } = {}): Promise<RepoSumm
     }
   }
 
-  // REST via PAT
-  const [pat] = await db
-    .select()
-    .from(githubConnections)
-    .where(eq(githubConnections.mode, 'pat'))
-    .limit(1);
-  if (!pat?.accessToken) return [];
+  // REST via OAuth or PAT (OAuth wins because pickActive prefers it).
+  const active = await getActiveToken();
+  if (!active) return [];
   const res = await fetch(
-    `https://api.github.com/user/repos?per_page=${limit}&sort=pushed&direction=desc`,
+    `https://api.github.com/user/repos?per_page=${limit}&sort=pushed&direction=desc&affiliation=owner,collaborator,organization_member`,
     {
       headers: {
-        Authorization: `Bearer ${pat.accessToken}`,
+        Authorization: `Bearer ${active.token}`,
         Accept: 'application/vnd.github+json',
         'User-Agent': 'AgentBoard',
       },

@@ -74,7 +74,7 @@ export interface Approval {
 
 export interface GithubStatus {
   connected: boolean;
-  mode: 'gh' | 'pat' | null;
+  mode: 'gh' | 'pat' | 'oauth' | 'app' | null;
   login: string | null;
   scopes: string[] | null;
   detail?: string;

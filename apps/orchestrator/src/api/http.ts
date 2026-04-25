@@ -31,13 +31,16 @@ import {
 } from '../db/schema.js';
 import {
   cloneRepo,
+  disconnectOauth,
   disconnectPat,
+  exchangeOauthCode,
   getGithubStatus,
   getIssue,
   listIssues,
   listProjectBranches,
   listPullRequests,
   listRepos,
+  saveOauthConnection,
   savePersonalAccessToken,
 } from '../github/client.js';
 import { spendSummary } from '../lib/budget.js';
@@ -50,9 +53,16 @@ import { eventBus } from '../events/bus.js';
 import { randomUUID } from 'node:crypto';
 import { createWorktree, removeWorktree } from '../worktree/manager.js';
 import { launchPreview, sanitizeProjectName, stopPreview } from '../worktree/docker.js';
-import { paths } from '../config.js';
+import { env, paths } from '../config.js';
 import { logger } from '../logger.js';
 import { loadRulesTemplate } from '../agents/persona.js';
+import {
+  deleteSetting,
+  getSetting,
+  setSetting,
+  type GithubOauthSettings,
+} from '../lib/settings.js';
+import { requireAdmin } from '../auth/middleware.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -1081,6 +1091,156 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
     return;
   });
 
+  /* ------------------- OAuth App flow -------------------
+   * Credentials live in app_settings (admin can paste them in /settings)
+   * with .env as a fallback for production deploys that prefer config files.
+   */
+  async function resolveOauthCreds(): Promise<GithubOauthSettings | null> {
+    const stored = await getSetting<GithubOauthSettings>('github.oauth');
+    if (stored?.clientId && stored?.clientSecret) {
+      return {
+        clientId: stored.clientId,
+        clientSecret: stored.clientSecret,
+        redirectUrl: stored.redirectUrl || env.GITHUB_OAUTH_REDIRECT_URL,
+      };
+    }
+    if (env.GITHUB_OAUTH_CLIENT_ID && env.GITHUB_OAUTH_CLIENT_SECRET) {
+      return {
+        clientId: env.GITHUB_OAUTH_CLIENT_ID,
+        clientSecret: env.GITHUB_OAUTH_CLIENT_SECRET,
+        redirectUrl: env.GITHUB_OAUTH_REDIRECT_URL,
+      };
+    }
+    return null;
+  }
+
+  // Status: tells the UI whether OAuth is configured AND from where.
+  // Admins also see the masked clientId; the secret is never returned.
+  app.get('/api/github/oauth/config', async (req) => {
+    const stored = await getSetting<GithubOauthSettings>('github.oauth');
+    const enabled = Boolean(
+      (stored?.clientId && stored?.clientSecret) ||
+        (env.GITHUB_OAUTH_CLIENT_ID && env.GITHUB_OAUTH_CLIENT_SECRET),
+    );
+    const source: 'db' | 'env' | null = stored?.clientId
+      ? 'db'
+      : env.GITHUB_OAUTH_CLIENT_ID
+        ? 'env'
+        : null;
+    const isAdmin = req.user?.role === 'admin';
+    return {
+      enabled,
+      source,
+      // Mask the client id — useful to confirm "yes, this is the right App"
+      // without re-exposing it in full.
+      clientIdMasked:
+        isAdmin && stored?.clientId
+          ? maskId(stored.clientId)
+          : env.GITHUB_OAUTH_CLIENT_ID
+            ? maskId(env.GITHUB_OAUTH_CLIENT_ID)
+            : null,
+      defaultRedirectUrl: env.GITHUB_OAUTH_REDIRECT_URL,
+    };
+  });
+
+  // Admin sets/replaces credentials from the UI.
+  const oauthCredsSchema = z.object({
+    clientId: z.string().trim().min(8).max(200),
+    clientSecret: z.string().trim().min(8).max(400),
+    redirectUrl: z.string().url().optional(),
+  });
+  app.put('/api/github/oauth/config', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const parsed = parseOr400(oauthCredsSchema, req.body, reply);
+    if (!parsed.ok) return;
+    await setSetting<GithubOauthSettings>('github.oauth', parsed.value, req.user!.id);
+    return { ok: true };
+  });
+
+  app.delete('/api/github/oauth/config', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    await deleteSetting('github.oauth');
+    return { ok: true };
+  });
+
+  // Kicks off the OAuth flow: returns the URL the browser should hop to.
+  // We bake `state` into a short-lived cookie so the callback can verify
+  // the round-trip and prevent CSRF.
+  app.get('/api/github/oauth/start', async (req, reply) => {
+    const creds = await resolveOauthCreds();
+    if (!creds) {
+      return sendError(reply, 412, 'oauth_not_configured', 'Set client id/secret in Settings → GitHub');
+    }
+    const state = randomUUID();
+    reply.setCookie('gh_oauth_state', state, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 600,
+      secure: process.env.NODE_ENV === 'production',
+    });
+    const url = new URL('https://github.com/login/oauth/authorize');
+    url.searchParams.set('client_id', creds.clientId);
+    url.searchParams.set('redirect_uri', creds.redirectUrl ?? env.GITHUB_OAUTH_REDIRECT_URL);
+    url.searchParams.set('state', state);
+    url.searchParams.set('scope', 'repo read:user read:org workflow');
+    return { url: url.toString() };
+  });
+
+  // GitHub bounces the user back here. We exchange `code` for a token,
+  // store it, then send a tiny HTML page that closes the popup or
+  // redirects back to /settings.
+  app.get('/api/github/oauth/callback', async (req, reply) => {
+    const creds = await resolveOauthCreds();
+    if (!creds) {
+      return reply
+        .code(412)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, 'OAuth credentials are not configured.'));
+    }
+    const q = (req.query ?? {}) as { code?: string; state?: string; error?: string };
+    if (q.error) {
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, `GitHub returned an error: ${q.error}`));
+    }
+    const cookieState = req.cookies?.['gh_oauth_state'];
+    if (!q.code || !q.state || !cookieState || q.state !== cookieState) {
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, 'OAuth state did not match — try again.'));
+    }
+    reply.clearCookie('gh_oauth_state', { path: '/' });
+    try {
+      const tok = await exchangeOauthCode(
+        q.code,
+        creds.redirectUrl ?? env.GITHUB_OAUTH_REDIRECT_URL,
+        creds.clientId,
+        creds.clientSecret,
+      );
+      await saveOauthConnection(tok.accessToken, tok.scope, tok.refreshToken);
+      logger.info('GitHub OAuth connection stored');
+      return reply
+        .code(200)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(true));
+    } catch (err) {
+      logger.warn({ err }, 'OAuth exchange failed');
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, (err as Error).message));
+    }
+  });
+
+  app.delete('/api/github/oauth', async (_req, reply) => {
+    await disconnectOauth();
+    reply.code(204);
+    return;
+  });
+
   app.get('/api/github/repos', async (req, reply) => {
     const q = (req.query ?? {}) as { limit?: string };
     const limit = q.limit ? Math.min(200, Math.max(1, Number(q.limit))) : 100;
@@ -1515,4 +1675,46 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
       return updated;
     },
   );
+}
+
+/* ────────────── OAuth callback HTML helper ──────────────
+ * Tiny self-closing page rendered when GitHub bounces the user back to
+ * /api/github/oauth/callback. If we're a popup we postMessage the result
+ * and close; otherwise we redirect back to /settings.
+ */
+function maskId(id: string): string {
+  if (id.length <= 8) return '****';
+  return `${id.slice(0, 4)}…${id.slice(-4)}`;
+}
+
+function callbackHtml(success: boolean, error?: string): string {
+  const safeError = (error ?? '').replace(/[<&"']/g, (c) =>
+    c === '<' ? '&lt;' : c === '&' ? '&amp;' : c === '"' ? '&quot;' : '&#39;',
+  );
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>${success ? 'Connected' : 'Connection failed'}</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0b0b0c; color: #e5e5e5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+  .card { max-width: 420px; padding: 28px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); text-align: center; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  p { color: #a0a0a0; font-size: 13px; margin: 0; }
+  .ok { color: #79e0a3; }
+  .err { color: #ff8080; }
+</style></head>
+<body>
+  <div class="card">
+    <h1 class="${success ? 'ok' : 'err'}">${success ? 'GitHub connected' : 'Connection failed'}</h1>
+    <p>${success ? 'You can close this tab and return to AgentBoard.' : safeError || 'See server logs.'}</p>
+  </div>
+  <script>
+    try {
+      if (window.opener) {
+        window.opener.postMessage({ type: 'agentboard:oauth', success: ${success ? 'true' : 'false'} }, '*');
+        setTimeout(() => window.close(), 800);
+      } else {
+        setTimeout(() => { location.href = '/settings'; }, 1200);
+      }
+    } catch (e) { /* ignore */ }
+  </script>
+</body></html>`;
 }
