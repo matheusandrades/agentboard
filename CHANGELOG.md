@@ -5,6 +5,88 @@ and the project tracks [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-04-25
+
+Big surface release: VSCode-style file browser, deep GitHub integration
+(OAuth + webhooks), a new Security Engineer default agent, chat @-mentions,
+plus a few /agents and /previews polish passes.
+
+### Added
+
+#### Code viewer
+- New "Files" tab on every connected project (`/projects/:id`) — a
+  collapsible tree on the left (lazy-loaded per folder) and a
+  Prism-highlighted reader on the right with breadcrumb + "open on
+  GitHub" link.
+- Read-only for now. Path-traversal guard, 1 MB hard cap on inline file
+  content, binary detection. Hidden directories (.git, node_modules,
+  dist, …) are flagged but not browsed by default.
+- Prism theme bound to AgentBoard's CSS tokens so it switches with the
+  global light/dark theme.
+
+#### GitHub integration (configurable from the UI)
+- New `app_settings` table — first consumer is the GitHub OAuth client
+  id/secret, edited from `/settings` by an admin (no `.env` editing
+  needed). `.env` still works as a production fallback.
+- `<OauthSetupDialog>` walks an admin through registering an OAuth App
+  on GitHub, with a one-click copy of the callback URL.
+- One-click "Connect with GitHub" button opens the GitHub authorisation
+  popup (Vercel/Linear-style). Token stored in `github_connections`
+  with mode='oauth'.
+- PAT moved under an "Advanced" toggle. `gh` CLI auto-detect kept.
+- `github_connections` schema gained `refresh_token`, `token_expires_at`,
+  `installation_id` to host the GitHub App flow next.
+
+#### GitHub webhooks
+- `POST /api/github/webhook` with HMAC SHA-256 verification (raw-body
+  capture installed via `addContentTypeParser`). Allowlisted from
+  session auth — GitHub deliveries carry a signature, not a cookie.
+- Translates `pull_request`, `push`, `issues`, and `check_run` events
+  into the existing UI event bus. PRs ready-for-review and failing
+  check_runs also drop a notification message into the team inbox so
+  agents react on their next turn.
+- `GET /api/github/webhook/config` reports whether webhooks are wired.
+
+#### Default agent: Sage (Security Engineer)
+- New `cybersec` role joins the default 8 → 9. Sage reviews PRs through
+  an attacker's lens (OWASP top 10, CWE, secret hygiene, dep audit,
+  authn/authz changes, schema reviews on PII tables).
+- Verdicts are explicit `BLOCK | ADVISE | APPROVE` with cited findings
+  and minimal fix suggestions; never gates on style or velocity.
+- `agents/cybersec.md` persona + `rules/cybersec.md` operating rules.
+
+#### Chat @-mentions
+- New `/api/mentions/search` returns a ranked, type-filterable list of
+  candidates (agents, tasks, commits).
+- `<MentionTextarea>` swaps in for the plain `<textarea>` in both the
+  full Chat page and the floating ChatLauncher. `@` triggers agent
+  search, `#` triggers task search; popup is positioned at the caret
+  via a hidden mirror div (Cursor / Linear / GitHub-style). ↑/↓/Enter/
+  Esc supported. Inserts tokens `@username`, `#task-xxxxxxxx`, or
+  `[commit:sha]` so agents see them in plain prompt text.
+- Skips email-shaped patterns so pasting an address doesn't open the
+  popup.
+
+### Changed
+
+- `/agents` page: filter chips moved to a dedicated row under the page
+  header with horizontal scroll. Long titles ("Database Administrator",
+  "Language Specialist"…) replaced with short tags (DBA, Language, etc.)
+  with role-tinted text. Header no longer overflows when 9 roles are on
+  the screen.
+- `/previews` got a second polish: header split into two rows (title
+  block + toolbar) so the Stop / Start button never gets clipped on
+  narrower viewports. Added a viewport switcher (mobile / tablet /
+  fluid) for live previews and a copy-URL chip in the toolbar.
+- User-menu dropdown is now portalled to `<body>` so it doesn't get
+  clipped under the header's `backdrop-blur` stacking context.
+
+### Fixed
+
+- Prism theme leaking generic colours through the rest of the UI.
+- Tests for `runAgentTurn` and `create_task` were brittle against the
+  budget guard and assignment-message side effects added in 0.2.0.
+
 ## [0.2.0] — 2026-04-25
 
 Authentication, RBAC, and a first-run install wizard. Until now anyone
@@ -160,6 +242,7 @@ real GitHub repos.
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, MIT `LICENSE`.
 - `.github/` issue templates, PR template, CI (typecheck + tests).
 
-[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/matheusandrades/agentboard/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.3.0
 [0.2.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.2.0
 [0.1.0]: https://github.com/matheusandrades/agentboard/releases/tag/v0.1.0
