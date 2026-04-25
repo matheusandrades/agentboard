@@ -14,6 +14,7 @@ export const ROLE_PORTRAIT: Record<AgentRole, string> = {
   'lang-specialist': '/avatars/ethan.png',
   frontend: '/avatars/ethan.png',
   backend: '/avatars/ethan.png',
+  cybersec: '/avatars/ethan.png',
 };
 
 /**
@@ -29,6 +30,7 @@ export const ROLE_GRADIENTS: Record<AgentRole, string> = {
   backend: 'linear-gradient(135deg, #8cedb5 0%, #1faa66 100%)',
   dba: 'linear-gradient(135deg, #ffd38a 0%, #e39212 100%)',
   qa: 'linear-gradient(135deg, #e1a7ff 0%, #9436d4 100%)',
+  cybersec: 'linear-gradient(135deg, #ff8c8c 0%, #b22222 100%)',
 };
 
 /** Hex accent for role text/ring — complement to the gradient. */
@@ -41,6 +43,7 @@ export const ROLE_TINT: Record<AgentRole, string> = {
   backend: 'text-[#79e0a3]',
   dba: 'text-[#ffcc80]',
   qa: 'text-[#d6a0ff]',
+  cybersec: 'text-[#ff9b9b]',
 };
 
 export const ROLE_RING: Record<AgentRole, string> = {
@@ -52,6 +55,7 @@ export const ROLE_RING: Record<AgentRole, string> = {
   backend: 'ring-[#79e0a3]/30',
   dba: 'ring-[#ffcc80]/30',
   qa: 'ring-[#d6a0ff]/30',
+  cybersec: 'ring-[#ff9b9b]/30',
 };
 
 export const STATUS_DOT: Record<AgentStatus, { color: string; pulse: boolean; label: string }> = {

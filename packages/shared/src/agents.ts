@@ -9,6 +9,7 @@ export const AgentRoleSchema = z.enum([
   'backend',
   'dba',
   'qa',
+  'cybersec',
 ]);
 export type AgentRole = z.infer<typeof AgentRoleSchema>;
 
@@ -76,4 +77,5 @@ export const AGENT_ROLES: Readonly<Record<AgentRole, { defaultName: string; titl
   backend: { defaultName: 'bruno-backend', title: 'Backend Engineer' },
   dba: { defaultName: 'dani-dba', title: 'Database Administrator' },
   qa: { defaultName: 'quin-qa', title: 'QA Engineer' },
+  cybersec: { defaultName: 'sage-cybersec', title: 'Security Engineer' },
 };
