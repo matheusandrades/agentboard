@@ -37,9 +37,9 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Code',
     items: [
-      { to: '/projects', label: 'Repos', icon: RepoIcon },
-      { to: '/previews', label: 'Preview', icon: PreviewIcon },
+      { to: '/projects', label: 'Projects', icon: RepoIcon },
       { to: '/commits', label: 'Commits', icon: CommitIcon },
+      { to: '/previews', label: 'Preview', icon: PreviewIcon },
     ],
   },
   {

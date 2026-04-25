@@ -12,13 +12,15 @@ import type {
   PullRequestSummary,
 } from '@/lib/types';
 
-type Tab = 'overview' | 'files' | 'pulls' | 'issues' | 'branches' | 'tasks';
+type Tab = 'files' | 'tasks' | 'pulls' | 'issues' | 'branches' | 'overview';
 
 export function ProjectDetail() {
   const { id = '' } = useParams();
   const agents = useBoardStore((s) => s.agents);
   const [project, setProject] = useState<ProjectDetailType | null>(null);
-  const [tab, setTab] = useState<Tab>('overview');
+  // Files-first: when a user clicks a project, they almost always want to
+  // see the code, not a stats overview.
+  const [tab, setTab] = useState<Tab>('files');
   const [pulls, setPulls] = useState<PullRequestSummary[]>([]);
   const [issues, setIssues] = useState<IssueSummary[]>([]);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
@@ -100,33 +102,76 @@ export function ProjectDetail() {
   const draftPRs = openPRs.filter((p) => p.isDraft);
   const openIssues = issues.filter((i) => i.state === 'OPEN');
 
+  const tabCounts: Record<Tab, number | null> = {
+    files: null,
+    tasks: project.tasks.length,
+    pulls: openPRs.length,
+    issues: openIssues.length,
+    branches: branches.length || null,
+    overview: null,
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <PageHeader
-        eyebrow={`${project.repoOwner}/${project.repoName}`}
-        title={project.name}
-        subtitle={
-          <span className="flex items-center gap-2">
-            <span className={['pill', project.visibility === 'public' ? 'pill-ok' : ''].join(' ')}>
-              {project.visibility}
-            </span>
-            <span className="pill">{project.defaultBranch}</span>
-            <a href={repoUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-              ↗ Open on GitHub
-            </a>
-          </span>
-        }
-        actions={
-          <div className="flex items-center gap-1.5">
-            {(['overview', 'files', 'pulls', 'issues', 'branches', 'tasks'] as Tab[]).map((t) => (
-              <Tabber key={t} active={tab === t} onClick={() => setTab(t)} label={tabLabel(t)} />
-            ))}
-            <button type="button" className="btn-ghost btn-sm" onClick={refresh}>
-              ↻
-            </button>
+      {/* Hero header — clear breadcrumb + identity + repo metadata */}
+      <header className="shrink-0 border-b border-hairline px-6 pb-3 pt-4">
+        <nav className="flex items-center gap-1 text-[11px] text-fg-3">
+          <Link to="/projects" className="hover:text-fg">
+            Projects
+          </Link>
+          <span>/</span>
+          <span className="text-fg-2">{project.repoOwner}</span>
+          <span>/</span>
+          <span className="text-fg">{project.repoName}</span>
+        </nav>
+        <div className="mt-1 flex items-end justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[20px] font-semibold tracking-tight text-fg">
+              {project.name}
+            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+              <span
+                className={['pill', project.visibility === 'public' ? 'pill-ok' : ''].join(' ')}
+              >
+                {project.visibility}
+              </span>
+              <span className="pill">{project.defaultBranch}</span>
+              {project.description ? (
+                <span className="truncate text-fg-2">· {project.description}</span>
+              ) : null}
+              <a
+                href={repoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-auto text-fg-3 hover:text-fg"
+              >
+                {project.repoOwner}/{project.repoName} ↗
+              </a>
+            </div>
           </div>
-        }
-      />
+          <button
+            type="button"
+            className="btn-ghost btn-sm shrink-0"
+            onClick={refresh}
+            title="Refresh"
+          >
+            ↻
+          </button>
+        </div>
+
+        {/* Tab rail — its own row, scrolls horizontally on overflow */}
+        <nav className="-mx-6 mt-3 flex items-center gap-0 overflow-x-auto border-t border-hairline px-6 pt-1.5 [scrollbar-width:thin]">
+          {(['files', 'tasks', 'pulls', 'issues', 'branches', 'overview'] as Tab[]).map((t) => (
+            <Tabber
+              key={t}
+              active={tab === t}
+              onClick={() => setTab(t)}
+              label={tabLabel(t)}
+              count={tabCounts[t]}
+            />
+          ))}
+        </nav>
+      </header>
 
       {error ? (
         <div className="border-b border-err/40 bg-err-soft px-6 py-2 text-[12px] text-err">
@@ -634,23 +679,36 @@ function Tabber({
   active,
   onClick,
   label,
+  count,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
+  count?: number | null;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        'rounded-full border px-2.5 py-1 text-[11px] capitalize transition',
-        active
-          ? 'border-violet/50 bg-violet-soft text-fg shadow-glow-sm'
-          : 'border-hairline bg-sheen/[0.02] text-fg-2 hover:border-hairline-strong hover:text-fg',
+        'group relative inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-[12.5px] capitalize transition',
+        active ? 'text-fg' : 'text-fg-3 hover:text-fg',
       ].join(' ')}
     >
-      {label}
+      <span>{label}</span>
+      {typeof count === 'number' && count > 0 ? (
+        <span
+          className={[
+            'rounded-md px-1 font-mono text-[10px] tnum',
+            active ? 'bg-accent/15 text-accent' : 'bg-sheen/[0.06] text-fg-3',
+          ].join(' ')}
+        >
+          {count}
+        </span>
+      ) : null}
+      {active ? (
+        <span className="absolute inset-x-2 -bottom-px h-0.5 bg-accent" aria-hidden />
+      ) : null}
     </button>
   );
 }
