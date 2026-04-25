@@ -204,11 +204,27 @@ No rule should flip at any other pixel value.
 | mobile   | `< 734px`          | Single column · reduced typography (48px hero, 19px tagline) · "Menu" affordance · 48px nav height · 22px page padding · stacked footer |
 | tablet+  | `≥ 734px`          | Desktop-style nav (links visible, 64px tall) · full typography (80px hero, 24px tagline) · 44px page padding · single-row footer |
 
-> **1024px is NOT a layout breakpoint.** It only matters as a visual
-> side-effect: once the viewport exceeds ~1068px (980px container + 44×2
-> padding), horizontal padding naturally falls to `auto` because the
-> fixed-width container takes over. No media query needed for that
-> transition — let the container do the work.
+> **1024px is NOT a layout breakpoint.** Nothing that a user perceives
+> as "the page restructured" happens there. The only rule that touches
+> 1024 is a CSS-math correction: once the 980px container is fully
+> visible, its internal horizontal padding is zeroed so that the auto
+> left/right margins (`margin: 0 auto`) can handle side space on their
+> own. Without that zeroing you'd get *both* margin AND padding on each
+> side — 88px of empty space per side on a wide screen, which reads as
+> loose. So at `≥ 1024px`:
+>
+> ```css
+> .nav__inner,
+> .hero,
+> .footer__inner { padding-inline: 0; }
+> ```
+>
+> This is bookkeeping, not a layout change. Users don't notice a
+> restructure — they see the container sit where it was going to sit
+> anyway, just without double-spacing at the edges. (Pedantically the
+> math line is 1068px = 980 + 44×2, but 1024 is the conventional pixel
+> to anchor to, and the 44px window between 1024–1068 just shows a
+> slightly narrower container; no visual glitch.)
 
 > Implementation note: Tailwind's default `md` breakpoint is 768px, which
 > is *close to* but not 734. Extend the theme
