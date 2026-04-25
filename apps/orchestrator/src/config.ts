@@ -47,6 +47,11 @@ const EnvSchema = z.object({
     .string()
     .default('http://localhost:3001/api/github/oauth/callback'),
 
+  // Public-facing base URL of the orchestrator. Used for GitHub App
+  // manifest callbacks, installation callbacks, and webhook URLs. If
+  // unset we derive it by stripping the OAuth callback suffix above.
+  PUBLIC_BASE_URL: z.string().optional(),
+
   // GitHub App (optional, for finer-grained per-repo install). When unset
   // we expose the OAuth flow + PAT only.
   GITHUB_APP_ID: z.string().optional(),

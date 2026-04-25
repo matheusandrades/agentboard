@@ -17,12 +17,14 @@ export function Settings() {
   const [oauthBusy, setOauthBusy] = useState(false);
   const [showPat, setShowPat] = useState(false);
   const [showOauthSetup, setShowOauthSetup] = useState(false);
+  const [appCfg, setAppCfg] = useState<api.GithubAppConfig | null>(null);
+  const [showAppCreate, setShowAppCreate] = useState(false);
   const me = useAuth((s) => s.user);
 
   async function refresh() {
     setLoading(true);
     try {
-      const [s, c] = await Promise.all([
+      const [s, c, ac] = await Promise.all([
         api.githubStatus(),
         api.githubOauthConfig().catch(
           () =>
@@ -33,9 +35,22 @@ export function Settings() {
               defaultRedirectUrl: '',
             }) satisfies api.GithubOauthConfig,
         ),
+        api.githubAppConfig().catch(
+          () =>
+            ({
+              configured: false,
+              slug: null,
+              htmlUrl: null,
+              installUrl: null,
+              manifestEndpoint: null,
+              baseUrl: '',
+              webBaseUrl: '',
+            }) satisfies api.GithubAppConfig,
+        ),
       ]);
       setStatus(s);
       setOauthCfg(c);
+      setAppCfg(ac);
     } finally {
       setLoading(false);
     }
@@ -57,6 +72,18 @@ export function Settings() {
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
+  }, []);
+
+  // Re-pull GitHub status when the user comes back to this tab. They
+  // might have just registered an App or finished an installation in
+  // another tab; we want the UI to reflect that without a manual
+  // refresh.
+  useEffect(() => {
+    const onFocus = () => {
+      void refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   async function connect(e: React.FormEvent) {
@@ -196,6 +223,21 @@ export function Settings() {
             </div>
           ) : (
             <div className="mt-5 space-y-5">
+              {/* Recommended path: GitHub App */}
+              {appCfg ? (
+                <GithubAppSection
+                  cfg={appCfg}
+                  isAdmin={me?.role === 'admin'}
+                  onCreate={() => setShowAppCreate(true)}
+                  onForget={async () => {
+                    if (!confirm('Forget the saved GitHub App? You will need to recreate it.'))
+                      return;
+                    await api.githubAppForget();
+                    await refresh();
+                  }}
+                />
+              ) : null}
+
               {oauthCfg?.enabled ? (
                 <div className="rounded-xl border border-hairline bg-sheen/[0.03] p-4">
                   <div className="flex items-start gap-3">
@@ -340,6 +382,19 @@ export function Settings() {
           onClose={() => setShowOauthSetup(false)}
           onSaved={() => {
             setShowOauthSetup(false);
+            void refresh();
+          }}
+        />
+      ) : null}
+
+      {showAppCreate && me?.role === 'admin' ? (
+        <CreateGithubAppDialog
+          baseUrl={appCfg?.baseUrl ?? ''}
+          webBaseUrl={appCfg?.webBaseUrl ?? ''}
+          onClose={() => {
+            setShowAppCreate(false);
+            // The user is now on GitHub in a new tab. We refresh on
+            // window focus so when they come back the App row appears.
             void refresh();
           }}
         />
@@ -526,6 +581,205 @@ function OauthSetupDialog({
 }
 
 /* ──────── Outbound notifications card ──────── */
+/* ──────── GitHub App section + create dialog ──────── */
+function GithubAppSection({
+  cfg,
+  isAdmin,
+  onCreate,
+  onForget,
+}: {
+  cfg: api.GithubAppConfig;
+  isAdmin: boolean;
+  onCreate: () => void;
+  onForget: () => void;
+}) {
+  if (cfg.configured) {
+    return (
+      <div className="rounded-xl border border-accent/40 bg-accent-soft p-4">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-[13px] font-medium text-fg">GitHub App ready</p>
+              <span className="pill pill-ok text-[10px]">recommended</span>
+            </div>
+            <p className="mt-1 text-[11.5px] text-fg-2">
+              The App <span className="font-mono text-fg">{cfg.slug}</span> is registered. Install
+              it on the orgs / repos you want agents to operate on.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {cfg.installUrl ? (
+              <a
+                className="btn btn-sm"
+                href={cfg.installUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Install on a repo ↗
+              </a>
+            ) : null}
+            {cfg.htmlUrl ? (
+              <a
+                className="btn-ghost btn-sm"
+                href={cfg.htmlUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Manage on GitHub ↗
+              </a>
+            ) : null}
+            {isAdmin ? (
+              <button type="button" className="btn-ghost btn-sm" onClick={onForget}>
+                Forget
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (!isAdmin) {
+    return (
+      <div className="rounded-xl border border-hairline bg-sheen/[0.02] p-4">
+        <p className="text-[13px] font-medium text-fg">GitHub App (recommended)</p>
+        <p className="mt-1 text-[11.5px] text-fg-2">
+          Ask an administrator to set up a GitHub App. It gives the agents fine-grained per-repo
+          access without anyone pasting a personal token.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-accent/40 bg-accent-soft p-4">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-[13px] font-medium text-fg">Set up GitHub App</p>
+            <span className="pill pill-ok text-[10px]">recommended</span>
+          </div>
+          <p className="mt-1 text-[11.5px] text-fg-2">
+            One click sends you to GitHub with a pre-filled manifest — no copy-pasting client ids,
+            secrets, webhook URLs, or permissions. After that, install it on whichever repos you
+            want.
+          </p>
+        </div>
+        <button type="button" className="btn btn-sm shrink-0" onClick={onCreate}>
+          Create GitHub App
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CreateGithubAppDialog({
+  baseUrl,
+  webBaseUrl,
+  onClose,
+}: {
+  baseUrl: string;
+  webBaseUrl: string;
+  onClose: () => void;
+}) {
+  const defaultName = `agentboard-${(webBaseUrl || baseUrl).replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').slice(0, 30)}`;
+  const [name, setName] = useState(defaultName);
+  const [organization, setOrganization] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy || !name.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const { manifest, action } = await api.githubAppPrepareManifest({
+        name: name.trim(),
+        organization: organization.trim() || undefined,
+      });
+      // POST a hidden form to GitHub. We can't fetch() it because the
+      // manifest endpoint must be reached through a real form submission
+      // that opens a confirmation page in a new tab.
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = action;
+      form.target = '_blank';
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'manifest';
+      input.value = manifest;
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+      onClose();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to prepare manifest');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-2xl border border-hairline bg-canvas-raised p-6"
+      >
+        <h2 className="text-[16px] font-medium text-fg">Create GitHub App</h2>
+        <p className="mt-1 text-[12px] text-fg-2">
+          A new tab will open on GitHub showing a confirmation page. Click <strong>Create</strong>{' '}
+          there and you'll be sent right back here.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="block">
+            <span className="eyebrow mb-1 block">App name</span>
+            <input
+              type="text"
+              required
+              autoComplete="off"
+              className="input w-full"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <p className="mt-1 text-[11px] text-fg-3">
+              Must be unique on GitHub. We'll prefix yours with{' '}
+              <code className="font-mono">agentboard-</code> by default.
+            </p>
+          </label>
+          <label className="block">
+            <span className="eyebrow mb-1 block">Organization (optional)</span>
+            <input
+              type="text"
+              autoComplete="off"
+              className="input w-full"
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              placeholder="leave blank to install under your personal account"
+            />
+          </label>
+        </div>
+        {err ? (
+          <div className="mt-3 rounded-lg border border-err/40 bg-err-soft px-3 py-2 text-[12px] text-err">
+            {err}
+          </div>
+        ) : null}
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button type="button" className="btn-ghost btn-sm" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-sm" disabled={busy || !name.trim()}>
+            {busy ? 'Preparing…' : 'Continue on GitHub →'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function NotificationsCard() {
   const [items, setItems] = useState<NotificationConfig[]>([]);
   const [loading, setLoading] = useState(true);

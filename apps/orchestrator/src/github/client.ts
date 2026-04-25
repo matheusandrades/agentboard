@@ -103,6 +103,20 @@ export async function getActiveToken(): Promise<{ token: string; mode: GithubMod
   const active = await pickActiveConnection();
   if (!active) return null;
   if (active.mode === 'gh') return null;
+
+  // For mode='app' the stored token is a short-lived installation
+  // token. Mint a fresh one on each call so we never serve an expired
+  // one (the helper caches internally).
+  if (active.mode === 'app' && active.installationId) {
+    try {
+      const { getInstallationToken } = await import('./app.js');
+      const token = await getInstallationToken(active.installationId);
+      return { token, mode: 'app' };
+    } catch (err) {
+      logger.warn({ err }, 'Failed to mint App installation token, falling back');
+    }
+  }
+
   if (!active.accessToken) return null;
   return { token: active.accessToken, mode: active.mode as GithubMode };
 }

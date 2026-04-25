@@ -13,9 +13,21 @@ export interface GithubOauthSettings extends Record<string, unknown> {
   clientId: string;
   clientSecret: string;
   redirectUrl?: string; // optional override; defaults to env GITHUB_OAUTH_REDIRECT_URL
+  webhookSecret?: string; // shared between OAuth + App for now
 }
 
-export type SettingKey = 'github.oauth';
+export interface GithubAppSettings extends Record<string, unknown> {
+  appId: number;
+  slug: string;
+  name: string;
+  clientId: string;
+  clientSecret: string;
+  privateKey: string; // PEM
+  webhookSecret: string;
+  htmlUrl: string;
+}
+
+export type SettingKey = 'github.oauth' | 'github.app';
 
 /** Generic getter — returns undefined if the row is missing. */
 export async function getSetting<T extends Record<string, unknown>>(

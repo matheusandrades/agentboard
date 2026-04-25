@@ -22,6 +22,7 @@ import {
   approvals,
   auditEvents,
   commits,
+  githubConnections,
   messages,
   notifications,
   previews,
@@ -60,8 +61,14 @@ import {
   deleteSetting,
   getSetting,
   setSetting,
+  type GithubAppSettings,
   type GithubOauthSettings,
 } from '../lib/settings.js';
+import {
+  buildManifest,
+  exchangeAppManifestCode,
+  getInstallationToken,
+} from '../github/app.js';
 import { requireAdmin } from '../auth/middleware.js';
 
 const execFileAsync = promisify(execFile);
@@ -1239,6 +1246,186 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
     await disconnectOauth();
     reply.code(204);
     return;
+  });
+
+  /* ------------------- GitHub App (manifest + install) ------------------- */
+  // What does the UI need to know?
+  //   - is a public callback host configured?
+  //   - is an App already saved?
+  //   - is there an active installation?
+  app.get('/api/github/app/config', async (req) => {
+    const stored = await getSetting<GithubAppSettings>('github.app');
+    const baseUrl = env.PUBLIC_BASE_URL || env.GITHUB_OAUTH_REDIRECT_URL.replace(
+      /\/api\/github\/oauth\/callback$/,
+      '',
+    );
+    const webBaseUrl = env.VITE_WEB_URL;
+    const isAdmin = req.user?.role === 'admin';
+    return {
+      configured: Boolean(stored?.appId),
+      slug: stored?.slug ?? null,
+      htmlUrl: stored?.htmlUrl ?? null,
+      installUrl: stored?.slug ? `https://github.com/apps/${stored.slug}/installations/new` : null,
+      // Admins see the manifest endpoint URL so they can build the
+      // form on the client without us echoing the secrets.
+      manifestEndpoint: isAdmin ? '/api/github/app/manifest' : null,
+      baseUrl,
+      webBaseUrl,
+    };
+  });
+
+  // Returns the JSON manifest form fields. The UI POSTs them to
+  // https://github.com/settings/apps/new?state=…  and GitHub redirects
+  // back to /api/github/app/manifest/callback with `code`.
+  const manifestPrepSchema = z.object({
+    name: z.string().trim().min(3).max(80),
+    description: z.string().trim().max(500).optional(),
+    organization: z.string().trim().max(80).optional(),
+  });
+  app.post('/api/github/app/manifest', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const parsed = parseOr400(manifestPrepSchema, req.body, reply);
+    if (!parsed.ok) return;
+    const baseUrl =
+      env.PUBLIC_BASE_URL ||
+      env.GITHUB_OAUTH_REDIRECT_URL.replace(/\/api\/github\/oauth\/callback$/, '');
+    const manifest = buildManifest({
+      baseUrl,
+      webBaseUrl: env.VITE_WEB_URL,
+      name: parsed.value.name,
+      description: parsed.value.description,
+    });
+    const state = randomUUID();
+    reply.setCookie('gh_app_manifest_state', state, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 600,
+      secure: process.env.NODE_ENV === 'production',
+    });
+    const formAction = parsed.value.organization
+      ? `https://github.com/organizations/${encodeURIComponent(parsed.value.organization)}/settings/apps/new?state=${state}`
+      : `https://github.com/settings/apps/new?state=${state}`;
+    return { manifest: JSON.stringify(manifest), action: formAction, state };
+  });
+
+  app.get('/api/github/app/manifest/callback', async (req, reply) => {
+    const q = (req.query ?? {}) as { code?: string; state?: string; error?: string };
+    if (q.error) {
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, `GitHub returned an error: ${q.error}`));
+    }
+    const cookieState = req.cookies?.['gh_app_manifest_state'];
+    if (!q.code || !q.state || !cookieState || q.state !== cookieState) {
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, 'Manifest state did not match — try again.'));
+    }
+    reply.clearCookie('gh_app_manifest_state', { path: '/' });
+    try {
+      const created = await exchangeAppManifestCode(q.code);
+      logger.info({ slug: created.slug }, 'GitHub App created via manifest');
+      return reply
+        .code(200)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(true, `App "${created.slug}" created. Now install it on your repos.`));
+    } catch (err) {
+      logger.warn({ err }, 'Manifest exchange failed');
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, (err as Error).message));
+    }
+  });
+
+  // Convenience for the UI to redirect — /apps/<slug>/installations/new
+  app.get('/api/github/app/install', async (_req, reply) => {
+    const app = await getSetting<GithubAppSettings>('github.app');
+    if (!app?.slug) return sendError(reply, 412, 'app_not_configured');
+    return reply.redirect(`https://github.com/apps/${app.slug}/installations/new`);
+  });
+
+  // GitHub bounces the user back here after they pick the install target
+  // (org or personal account) and the repos. We persist installation_id
+  // on the github_connections row so subsequent listRepos / clone calls
+  // can mint installation tokens.
+  app.get('/api/github/app/installation/callback', async (req, reply) => {
+    const q = (req.query ?? {}) as {
+      installation_id?: string;
+      setup_action?: string;
+    };
+    if (!q.installation_id) {
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, 'Missing installation_id in callback.'));
+    }
+    const installationId = Number(q.installation_id);
+    if (!Number.isFinite(installationId)) {
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, 'Invalid installation id.'));
+    }
+    try {
+      // Mint the first installation token to verify the App is wired
+      // and to grab a login for the connection row.
+      const token = await getInstallationToken(installationId);
+      const meRes = await fetch('https://api.github.com/installation/repositories', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'AgentBoard',
+        },
+      });
+      const meBody = (await meRes.json()) as {
+        repositories?: Array<{ owner: { login: string } }>;
+      };
+      const login = meBody.repositories?.[0]?.owner?.login ?? `installation-${installationId}`;
+      const existing = (await db.select().from(githubConnections)).find((r) => r.mode === 'app');
+      if (existing) {
+        await db
+          .update(githubConnections)
+          .set({ login, accessToken: token, installationId, scopes: 'app' })
+          .where(eq(githubConnections.id, existing.id));
+      } else {
+        await db.insert(githubConnections).values({
+          mode: 'app',
+          login,
+          accessToken: token,
+          installationId,
+          scopes: 'app',
+        });
+      }
+      return reply
+        .code(200)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(true, 'Installation linked. You can close this tab.'));
+    } catch (err) {
+      logger.warn({ err }, 'install callback failed');
+      return reply
+        .code(400)
+        .header('content-type', 'text/html; charset=utf-8')
+        .send(callbackHtml(false, (err as Error).message));
+    }
+  });
+
+  app.delete('/api/github/app', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    await db.delete(githubConnections).where(eq(githubConnections.mode, 'app'));
+    return { ok: true };
+  });
+
+  // Wipe the saved App credentials entirely (admin only). Doesn't touch
+  // GitHub itself — the operator still has to delete it there.
+  app.delete('/api/github/app/config', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    await deleteSetting('github.app');
+    await db.delete(githubConnections).where(eq(githubConnections.mode, 'app'));
+    return { ok: true };
   });
 
   app.get('/api/github/repos', async (req, reply) => {

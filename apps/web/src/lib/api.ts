@@ -194,6 +194,33 @@ export const saveGithubOauthCreds = (body: {
 export const clearGithubOauthCreds = () =>
   request<{ ok: true }>('DELETE', '/api/github/oauth/config');
 
+// GitHub App manifest + install flow
+export interface GithubAppConfig {
+  configured: boolean;
+  slug: string | null;
+  htmlUrl: string | null;
+  installUrl: string | null;
+  manifestEndpoint: string | null;
+  baseUrl: string;
+  webBaseUrl: string;
+}
+export const githubAppConfig = () =>
+  request<GithubAppConfig>('GET', '/api/github/app/config');
+export const githubAppPrepareManifest = (body: {
+  name: string;
+  description?: string;
+  organization?: string;
+}) =>
+  request<{ manifest: string; action: string; state: string }>(
+    'POST',
+    '/api/github/app/manifest',
+    { body },
+  );
+export const githubAppDisconnectInstallation = () =>
+  request<{ ok: true }>('DELETE', '/api/github/app');
+export const githubAppForget = () =>
+  request<{ ok: true }>('DELETE', '/api/github/app/config');
+
 // ---------- Projects ----------
 export const listProjects = () => request<Project[]>('GET', '/api/projects');
 export const getProject = (id: string) => request<ProjectDetail>('GET', `/api/projects/${id}`);

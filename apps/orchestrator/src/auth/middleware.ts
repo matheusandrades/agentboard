@@ -123,6 +123,11 @@ const PUBLIC_ROUTES = new Set([
   // but we keep this in the allowlist so the response doesn't 401 if
   // their session expired during the round-trip.
   '/api/github/oauth/callback',
+  // GitHub App manifest + installation callbacks come from GitHub
+  // redirecting the operator's browser. Session cookie travels with
+  // them but we keep these public for resilience.
+  '/api/github/app/manifest/callback',
+  '/api/github/app/installation/callback',
   // GitHub webhook deliveries are signed by HMAC, not by our session.
   '/api/github/webhook',
 ]);
