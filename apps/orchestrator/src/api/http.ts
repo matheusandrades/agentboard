@@ -1282,6 +1282,7 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
     name: z.string().trim().min(3).max(80),
     description: z.string().trim().max(500).optional(),
     organization: z.string().trim().max(80).optional(),
+    webhookPublicUrl: z.string().trim().url().optional(),
   });
   app.post('/api/github/app/manifest', async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
@@ -1295,6 +1296,7 @@ export async function registerHttpRoutes(app: FastifyInstance): Promise<void> {
       webBaseUrl: env.VITE_WEB_URL,
       name: parsed.value.name,
       description: parsed.value.description,
+      webhookPublicUrl: parsed.value.webhookPublicUrl,
     });
     const state = randomUUID();
     reply.setCookie('gh_app_manifest_state', state, {

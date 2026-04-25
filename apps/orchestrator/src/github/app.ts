@@ -132,10 +132,37 @@ export interface ManifestInput {
   webBaseUrl: string; // public URL of the web app, used as setup_url
   name: string;
   description?: string;
+  /**
+   * Public URL where GitHub should POST webhooks. Optional — if absent
+   * (or pointing at localhost) we omit the hook block entirely so
+   * GitHub's manifest validator doesn't reject the App. Operators can
+   * paste an ngrok / cloudflared URL here while developing.
+   */
+  webhookPublicUrl?: string;
+}
+
+function isPubliclyReachable(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname.endsWith('.local')) {
+      return false;
+    }
+    if (u.hostname.startsWith('192.168.') || u.hostname.startsWith('10.') || u.hostname.startsWith('172.16.')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function buildManifest(input: ManifestInput): Record<string, unknown> {
-  return {
+  const webhookCandidate =
+    input.webhookPublicUrl?.trim() ||
+    `${input.baseUrl}/api/github/webhook`;
+  const useWebhook = isPubliclyReachable(webhookCandidate);
+
+  const manifest: Record<string, unknown> = {
     name: input.name,
     description:
       input.description ??
@@ -147,21 +174,6 @@ export function buildManifest(input: ManifestInput): Record<string, unknown> {
     setup_url: `${input.webBaseUrl}/settings`,
     setup_on_update: false,
     request_oauth_on_install: false,
-    hook_attributes: {
-      url: `${input.baseUrl}/api/github/webhook`,
-      active: true,
-    },
-    default_events: [
-      'push',
-      'pull_request',
-      'pull_request_review',
-      'pull_request_review_comment',
-      'issues',
-      'issue_comment',
-      'check_run',
-      'check_suite',
-      'release',
-    ],
     default_permissions: {
       contents: 'write',
       metadata: 'read',
@@ -172,4 +184,22 @@ export function buildManifest(input: ManifestInput): Record<string, unknown> {
       members: 'read',
     },
   };
+  if (useWebhook) {
+    manifest.hook_attributes = {
+      url: webhookCandidate,
+      active: true,
+    };
+    manifest.default_events = [
+      'push',
+      'pull_request',
+      'pull_request_review',
+      'pull_request_review_comment',
+      'issues',
+      'issue_comment',
+      'check_run',
+      'check_suite',
+      'release',
+    ];
+  }
+  return manifest;
 }

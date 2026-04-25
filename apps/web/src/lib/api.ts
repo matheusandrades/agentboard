@@ -222,6 +222,7 @@ export const githubAppPrepareManifest = (body: {
   name: string;
   description?: string;
   organization?: string;
+  webhookPublicUrl?: string;
 }) =>
   request<{ manifest: string; action: string; state: string }>(
     'POST',

@@ -755,8 +755,13 @@ function CreateGithubAppDialog({
   const defaultName = `agentboard-${(webBaseUrl || baseUrl).replace(/^https?:\/\//, '').replace(/[^a-z0-9]+/gi, '-').slice(0, 30)}`;
   const [name, setName] = useState(defaultName);
   const [organization, setOrganization] = useState('');
+  const [webhookPublicUrl, setWebhookPublicUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // GitHub rejects the manifest if hook_attributes.url isn't reachable
+  // from the public internet. Detect and warn the operator.
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1|.+\.local)/i.test(baseUrl);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -767,6 +772,7 @@ function CreateGithubAppDialog({
       const { manifest, action } = await api.githubAppPrepareManifest({
         name: name.trim(),
         organization: organization.trim() || undefined,
+        webhookPublicUrl: webhookPublicUrl.trim() || undefined,
       });
       // POST a hidden form to GitHub. We can't fetch() it because the
       // manifest endpoint must be reached through a real form submission
@@ -832,6 +838,26 @@ function CreateGithubAppDialog({
               onChange={(e) => setOrganization(e.target.value)}
               placeholder="leave blank to install under your personal account"
             />
+          </label>
+          <label className="block">
+            <span className="eyebrow mb-1 block">Public webhook URL (optional)</span>
+            <input
+              type="url"
+              autoComplete="off"
+              className="input w-full font-mono text-[12px]"
+              value={webhookPublicUrl}
+              onChange={(e) => setWebhookPublicUrl(e.target.value)}
+              placeholder={
+                isLocalhost
+                  ? 'https://your-tunnel.ngrok.app/api/github/webhook'
+                  : `${baseUrl}/api/github/webhook`
+              }
+            />
+            <p className="mt-1 text-[11px] text-fg-3">
+              {isLocalhost
+                ? "GitHub doesn't accept localhost as a webhook target. Leave blank to register the App without webhooks (you can add them later), or paste an ngrok / cloudflared tunnel URL."
+                : 'Defaults to this orchestrator. Override only if the public host differs.'}
+            </p>
           </label>
         </div>
         {err ? (
