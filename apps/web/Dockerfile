@@ -19,8 +19,10 @@ COPY apps/web ./apps/web
 
 ARG VITE_API_URL
 ARG VITE_WS_URL
+ARG VITE_DEMO
 ENV VITE_API_URL=${VITE_API_URL}
 ENV VITE_WS_URL=${VITE_WS_URL}
+ENV VITE_DEMO=${VITE_DEMO}
 
 RUN pnpm --filter @agentboard/web build
 

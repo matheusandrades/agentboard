@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -33,7 +33,20 @@ interface Props {
 export function KanbanBoard({ sprintId }: Props) {
   const tasks = useBoardStore((s) => s.tasks);
   const agents = useBoardStore((s) => s.agents);
+  const storeLoaded = useBoardStore((s) => s.loaded);
   const setTasks = useBoardStore((s) => s.setTasks);
+
+  // 200ms flash-prevent (957a6bce, item 5): skeleton only renders if the
+  // store hasn't loaded after 200ms. Fast fetches don't flicker.
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  useEffect(() => {
+    if (storeLoaded) {
+      setShowSkeleton(false);
+      return;
+    }
+    const t = setTimeout(() => setShowSkeleton(true), 200);
+    return () => clearTimeout(t);
+  }, [storeLoaded]);
 
   const filtered = useMemo(
     () => (sprintId ? tasks.filter((t) => t.sprintId === sprintId) : tasks),
@@ -95,6 +108,7 @@ export function KanbanBoard({ sprintId }: Props) {
             title={c.title}
             tasks={grouped[c.status]}
             agents={agents}
+            loading={showSkeleton}
             onOpenTask={(t) => setOpenTaskId(t.id)}
           />
         ))}
