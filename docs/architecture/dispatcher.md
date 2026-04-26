@@ -124,11 +124,13 @@ itself, because it tracks *cross-turn* behavior:
 notePairExchange({ threadId, windowMs = 120_000 })
 ```
 
-`INCR` a key `thread-exch:<threadId>` with a sliding TTL. Producers call
-this when an agent posts a reply on a thread. If the count exceeds a
-threshold (TBD; current threshold is policy in callers, not here), the
-caller can break the loop by forcing an `error` status on one side or
-surfacing it to the human operator.
+`INCR` a key `thread-exch:<threadId>` with a sliding TTL (default
+`120_000` ms). Producers call this when an agent posts a reply on a
+thread. The threshold is **policy in callers, not here**: today the
+`send_message` MCP tool rejects with "Too much back-and-forth on this
+thread (12+ messages in 2 min)" once the counter crosses **12**.
+Callers that don't enforce a threshold get a useful counter back and
+nothing else.
 
 It's **best-effort early warning**, not authoritative. The store is Redis
 with a TTL — under partition, we may miss exchanges. That's acceptable
@@ -303,6 +305,7 @@ sequenceDiagram
 - **Sharding by agent.** One stream, one group. We can run multiple orchestrator processes; they'll cooperate via the consumer group. We do not pin agents to processes.
 - **Exactly-once semantics on the wake-up signal.** At-least-once is the contract. Idempotent inbox handling makes this safe.
 - **Cross-tenant isolation at the queue level.** All agents share `dispatch:queue`. Cheaper than per-tenant streams; revisit if a noisy tenant becomes a real cost driver.
+- **Per-agent self-talk loop detection.** `notePairExchange` keys on `threadId`, so an agent that talks to itself on a fresh `threadId` every iteration won't trip the limiter. If this becomes a real failure mode, add a per-agent counter (e.g. `agent-turns:<id>` with a sliding window) at `enqueueDispatch` or at the top of `runAgentTurn`. Out of scope for the dispatcher itself.
 
 ## When to revisit this design
 
