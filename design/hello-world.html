@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello World</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Tailwind config — matches design tokens in hello-world-spec.md
+      tailwind.config = {
+        theme: {
+          extend: {
+            // Apple-style breakpoints. 734 is the real mobile↔tablet cut.
+            screens: {
+              tablet: "734px",
+              desktop: "1024px",
+            },
+            colors: {
+              canvas: "#FFFFFF",
+              subtle: "#F5F5F7",
+              ink: "#1D1D1F",
+              muted: "#86868B",
+              brand: {
+                DEFAULT: "#0071E3",
+                hover: "#0077ED",
+                active: "#006EDB",
+              },
+            },
+            fontFamily: {
+              sf: [
+                "-apple-system",
+                "BlinkMacSystemFont",
+                "SF Pro Display",
+                "SF Pro Text",
+                "Helvetica Neue",
+                "Helvetica",
+                "Arial",
+                "system-ui",
+                "sans-serif",
+              ],
+            },
+            letterSpacing: {
+              display: "-0.015em",
+              tight2: "-0.01em",
+            },
+            maxWidth: {
+              container: "980px",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      /* Respect users who prefer less motion */
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition-duration: 0ms !important;
+        }
+      }
+      /* Nav scroll state — toggled by the tiny script at the bottom */
+      .nav-scrolled {
+        background-color: rgba(255, 255, 255, 0.8);
+        backdrop-filter: saturate(180%) blur(20px);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      /* Focus ring matches spec: 3px, brand blue at 40% alpha, 2px offset */
+      .cta:focus-visible {
+        outline: 3px solid rgba(0, 113, 227, 0.4);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+
+  <body class="font-sf bg-canvas text-ink antialiased">
+    <!-- ─────────── NAV ─────────── -->
+    <header
+      id="nav"
+      class="sticky top-0 z-50 w-full transition-colors duration-200"
+    >
+      <nav
+        class="mx-auto flex h-12 max-w-container items-center justify-between px-[22px] tablet:h-16 tablet:px-11 desktop:px-0"
+      >
+        <a href="#" class="text-[17px] font-medium tracking-tight2 text-ink">
+          ◎ example
+        </a>
+
+        <!-- Tablet + desktop links (visible ≥ 734px) -->
+        <ul class="hidden items-center gap-8 tablet:flex">
+          <li>
+            <a href="#" class="text-sm tracking-tight2 text-ink hover:text-black"
+              >Product</a
+            >
+          </li>
+          <li>
+            <a href="#" class="text-sm tracking-tight2 text-ink hover:text-black"
+              >Support</a
+            >
+          </li>
+          <li>
+            <a href="#" class="text-sm tracking-tight2 text-ink hover:text-black"
+              >About</a
+            >
+          </li>
+          <li>
+            <a href="#" class="text-sm tracking-tight2 text-ink hover:text-black"
+              >Sign in</a
+            >
+          </li>
+        </ul>
+
+        <!-- Mobile "menu" affordance (< 734px, non-functional in v1) -->
+        <button
+          class="text-sm tracking-tight2 text-ink tablet:hidden"
+          aria-label="Open menu"
+        >
+          Menu
+        </button>
+      </nav>
+    </header>
+
+    <!-- ─────────── HERO ─────────── -->
+    <main
+      class="mx-auto flex max-w-container flex-col items-center px-[22px] pb-[72px] pt-14 text-center tablet:px-11 tablet:pb-32 tablet:pt-24 desktop:px-0"
+    >
+      <h1
+        class="text-[48px] font-semibold leading-[1.05] tracking-display text-ink tablet:text-[80px]"
+      >
+        Hello World
+      </h1>
+
+      <p
+        class="mt-6 max-w-[36ch] text-[19px] leading-[1.4] text-muted tablet:text-2xl"
+      >
+        A quiet greeting from a calm corner of the internet.
+      </p>
+
+      <a
+        href="#"
+        class="cta mt-8 inline-flex items-center justify-center rounded-full bg-brand px-[22px] py-3 text-[17px] tracking-tight2 text-white transition-colors duration-200 hover:bg-brand-hover active:bg-brand-active"
+      >
+        Say hello
+      </a>
+    </main>
+
+    <!-- ─────────── FOOTER ─────────── -->
+    <footer class="mt-auto border-t border-black/[0.08] bg-subtle">
+      <div
+        class="mx-auto flex max-w-container flex-col items-start justify-between gap-2 px-[22px] py-6 text-xs text-muted tablet:flex-row tablet:items-center tablet:px-11 desktop:px-0"
+      >
+        <ul class="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <li><a href="#" class="hover:text-ink">Made with care</a></li>
+          <li aria-hidden="true">·</li>
+          <li><a href="#" class="hover:text-ink">Privacy</a></li>
+          <li aria-hidden="true">·</li>
+          <li><a href="#" class="hover:text-ink">Terms</a></li>
+        </ul>
+        <p>© 2026 Example, Inc.</p>
+      </div>
+    </footer>
+
+    <script>
+      // Add a subtle blurred background once the user scrolls past 8px.
+      // Matches the Apple-style "the nav quietly notices you scrolled" effect.
+      const nav = document.getElementById("nav");
+      const onScroll = () => {
+        if (window.scrollY > 8) nav.classList.add("nav-scrolled");
+        else nav.classList.remove("nav-scrolled");
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+    </script>
+  </body>
+</html>

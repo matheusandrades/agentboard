@@ -503,7 +503,20 @@ export async function runAgentTurn(
     if (!timedOut) {
       await markMessagesRead(unread.map((m) => m.id));
     }
-    await setAgentStatus(agent.id, timedOut ? 'error' : 'idle');
+    // Don't pin the agent to 'error' on a timeout — that requires a manual
+    // reset and stalls the sprint. Drop them back to 'idle' and re-enqueue
+    // so the next dispatch retries with whatever fresh state they have.
+    if (timedOut) {
+      logger.warn({ agentId: agent.id, unread: unread.length }, 'Turn timed out, re-enqueueing');
+      await setAgentStatus(agent.id, 'idle');
+      try {
+        await enqueueDispatch(agent.id);
+      } catch (err) {
+        logger.warn({ err, agentId: agent.id }, 'Re-enqueue after timeout failed');
+      }
+    } else {
+      await setAgentStatus(agent.id, 'idle');
+    }
   } catch (e) {
     logger.error({ err: e, agentId: agent.id }, 'runAgentTurn failed');
 

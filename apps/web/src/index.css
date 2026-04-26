@@ -292,6 +292,33 @@ h4 {
   }
 
   .hr-soft { @apply border-t; border-color: rgb(var(--hairline) / 0.1); }
+
+  /* ─── 957a6bce: TaskCard polish-wave components ─── */
+
+  /* Borderless variant of `.pill` for use *inside* the task card. Quieter
+     when several pills sit in one column. Padding tuned to the 8pt grid. */
+  .task-pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] leading-none;
+  }
+
+  /* Subtle hover lift + accent focus ring per uma's 957a6bce spec.
+     Hover  : translateY(-1px) + 0 2px 8px rgba(0,0,0,.06), 150ms ease.
+     Focus  : 2px outline in accent at 40% alpha, 2px offset (focus-visible). */
+  .task-card {
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+  .task-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .task-card:focus { outline: none; }
+  .task-card:focus-visible {
+    outline: 2px solid rgb(var(--accent) / 0.4);
+    outline-offset: 2px;
+  }
+  /* Avoid the hover lift while a card is being dragged — dnd-kit applies
+     its own translate. */
+  .task-card[aria-pressed="true"]:hover { transform: none; }
 }
 
 @layer utilities {
