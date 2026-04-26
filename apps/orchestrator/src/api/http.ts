@@ -1971,30 +1971,41 @@ function callbackHtml(success: boolean, error?: string): string {
   const safeError = (error ?? '').replace(/[<&"']/g, (c) =>
     c === '<' ? '&lt;' : c === '&' ? '&amp;' : c === '"' ? '&quot;' : '&#39;',
   );
+  // Always redirect to the WEB app (env.VITE_WEB_URL). Using a relative
+  // /settings would resolve against the orchestrator's host (3001) and
+  // 404 — that's the bug we hit before. JSON-encode so weird hosts in
+  // env can't break the inline string.
+  const webSettingsUrl = JSON.stringify(`${env.VITE_WEB_URL.replace(/\/$/, '')}/settings`);
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${success ? 'Connected' : 'Connection failed'}</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #0b0b0c; color: #e5e5e5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
   .card { max-width: 420px; padding: 28px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); text-align: center; }
   h1 { font-size: 18px; margin: 0 0 8px; }
-  p { color: #a0a0a0; font-size: 13px; margin: 0; }
+  p { color: #a0a0a0; font-size: 13px; margin: 0 0 16px; }
   .ok { color: #79e0a3; }
   .err { color: #ff8080; }
+  a { color: #ff8c33; }
 </style></head>
 <body>
   <div class="card">
     <h1 class="${success ? 'ok' : 'err'}">${success ? 'GitHub connected' : 'Connection failed'}</h1>
     <p>${success ? 'You can close this tab and return to AgentBoard.' : safeError || 'See server logs.'}</p>
+    <a href=${webSettingsUrl}>Back to AgentBoard →</a>
   </div>
   <script>
+    var webSettings = ${webSettingsUrl};
     try {
-      if (window.opener) {
+      if (window.opener && !window.opener.closed) {
         window.opener.postMessage({ type: 'agentboard:oauth', success: ${success ? 'true' : 'false'} }, '*');
-        setTimeout(() => window.close(), 800);
+        setTimeout(function () { try { window.close(); } catch (e) {} }, 800);
+        // Belt + braces: if the popup didn't close (some browsers refuse
+        // when opener is cross-origin), fall back to the redirect.
+        setTimeout(function () { try { location.href = webSettings; } catch (e) {} }, 1500);
       } else {
-        setTimeout(() => { location.href = '/settings'; }, 1200);
+        setTimeout(function () { location.href = webSettings; }, 1200);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { location.href = webSettings; }
   </script>
 </body></html>`;
 }
