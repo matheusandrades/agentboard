@@ -33,7 +33,7 @@ const EnvSchema = z.object({
     .default('info'),
 
   AGENT_MAX_TURNS: z.coerce.number().int().positive().default(25),
-  AGENT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  AGENT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(900_000),
 
   WORKSPACE_ROOT: z.string().default(path.join(REPO_ROOT, 'workspace')),
 
