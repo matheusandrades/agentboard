@@ -7,7 +7,7 @@
       "@agentboard/shared": ["../../packages/shared/src/index.ts"],
       "@agentboard/shared/*": ["../../packages/shared/src/*"]
     },
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "types": ["node", "vite/client", "vitest/globals", "@testing-library/jest-dom"],
     "noEmit": true
   },
   "include": ["src", "vite.config.ts", "vitest.config.ts"]
