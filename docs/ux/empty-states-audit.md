@@ -2,7 +2,7 @@
 
 **Author:** uma-uiux
 **Task:** 6a6152e7-1bbd-42e9-ab5e-1a05437f8868
-**Status:** audit only — implementation is a follow-up
+**Status:** approved (leo-langs, PR #7) — review notes folded in; impl is a follow-up
 **Scope:** 12 top-level routes in the web app
 
 > An empty state is the state a user lands in *before* the system does
@@ -76,7 +76,10 @@ Adopt a four-rule house style for empty-state copy:
    "+ Connect your first repo".
 4. **Distinguish filter-empty from source-empty.** When a filter is
    applied: "No X match this filter — clear filters." When the source
-   is empty: "No X yet — <how to create one>."
+   is empty: "No X yet — <how to create one>." Filter-empty title is
+   singular ("this filter"); the CTA stays plural ("Clear filters")
+   even when only one chip is active — filter UIs usually expose
+   multiple, and a static plural label is safer than per-state copy.
 
 This applies to all empty states going forward. The per-page table
 below proposes specific copy in this style.
@@ -115,7 +118,7 @@ card has it.
 | Working agents     | No agents working | Agents become "working" when assigned a task.          | Open Chat ⌘K  |
 | Pending approvals  | Nothing to approve| Agents will queue requests here when they need a call. | —             |
 | Running previews   | No previews live  | Containers appear here once an agent ships a preview.  | —             |
-| Recent activity    | Nothing yet       | Tool calls, messages, and commits land here in real time. | —          |
+| Recent activity    | No activity yet   | Tool calls, messages, and commits land here in real time. | —          |
 
 ### 4.2 `/live`
 
@@ -141,11 +144,15 @@ making the whole board look broken when one column is empty). Could
 add a column-aware hint without losing brevity.
 
 **Proposed:**
-- **Backlog/Todo column:** title "Nothing here yet"; subtle hint
+- **Backlog/Todo column:** title "No tasks yet"; subtle hint
   "Drag a card in or chat ⌘K"; no CTA.
-- **In-progress / Review / Done columns:** title "Nothing here yet";
-  no body; no CTA. (These columns fill themselves; explaining is
-  noise.)
+- **In-progress / Review / Done columns:** title "No tasks in this
+  column"; no body; no CTA. (These columns fill themselves; explaining
+  is noise.)
+
+(Per leo-langs PR #7 review: "Nothing here yet" inherits the same
+shrug §2 calls out as a voice-inconsistency offender — a specific
+noun ("tasks") beats `Nothing` here as elsewhere.)
 
 ### 4.4 `/agents`
 
@@ -260,10 +267,20 @@ Slight rewrite for parallelism with the rest of the app.
 sub-cards. Combine voice; explain what triggers content.
 
 **Proposed:**
-- Per-day card: title "No usage in this range"; body "Usage tallies
-  appear once an agent makes its first model call.";
-- Per-agent card: same title + body, scoped to the selected agent.
+- **Source-empty** (no model calls have ever been made): title "No
+  usage yet"; body "Usage tallies appear once an agent makes its
+  first model call."
+- **Range-empty** (calls exist but not in the selected range):
+  title "No usage in this range"; body "Try a wider range, or check
+  back after the next agent run."
+- Per-agent card: same two-state pattern, scoped to the selected
+  agent.
 - CTA: none (passive metric).
+
+(Per leo-langs PR #7 review: spec must distinguish source-empty
+from range-empty per §3 rule 4 — first-load currently reads "No
+usage in this range" when there is no range and no anything, which
+lies. Two states fix that.)
 
 ### 4.11 `/approvals`
 
@@ -277,10 +294,16 @@ as "nothing exists" when the meaning is "nothing pending". Body is
 good and already context-aware ✅.
 
 **Proposed:**
-- Pending tab: title "All clear"; body "No agent is waiting on your
-  call right now."
+- Pending tab: title "No pending approvals"; body "Agents will queue
+  requests here when they need a call."
 - Approved/Rejected/All tabs: title "No records match this filter";
   body "Clear the filter to see history."; CTA "Clear filters".
+
+(Per leo-langs PR #7 review: keep §3 rule 1 absolute — title is a
+noun-phrase. "All clear" is a status interjection and would force a
+carve-out in the rule. "No pending approvals" parallels the rest of
+the audit's titles and is more scannable when filters are applied
+across tabs.)
 
 ### 4.12 `/settings`
 
@@ -297,14 +320,21 @@ what to do first.
 - Add a top-of-page **Setup Checklist** card that appears only when
   *any* required integration is missing. Items:
   - ☐ Connect GitHub
-  - ☐ Configure model API key
+  - ☐ Add a model API key
   - ☐ Add a project
-  - ☐ Verify notifications
+  - ☐ Confirm notifications
 - Each item links to its respective section. Card disappears once
   all items are checked.
 - Empty state for the card (when checklist would be empty): hide the
   card entirely. (Don't celebrate emptiness — just remove the
   scaffold.)
+
+(Per leo-langs PR #7 review: item 4 was "Verify notifications" — that
+implies confirming an existing config. Per carl-cto PR #8 §7.1: we
+add a `notifications_acknowledged_at` flag set on explicit Save, so
+the user is *acknowledging* the config — "Confirm" is the honest
+verb. See `settings-setup-checklist-spec.md` §3.1 for the full
+title/body pair.)
 
 This is the only page where the "audit" turns into a layout
 recommendation rather than a copy recommendation. Flagging
