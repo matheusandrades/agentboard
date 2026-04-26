@@ -22,6 +22,7 @@ import { guardrailsHook } from '../hooks/guardrails.js';
 import { eventBus } from '../events/bus.js';
 import { createWorktree, readWorktreeCommits } from '../worktree/manager.js';
 import { cloneRepo, ensureBranch } from '../github/client.js';
+import { enqueueDispatch } from '../redis/streams.js';
 import { env } from '../config.js';
 import { logger } from '../logger.js';
 import {
@@ -505,10 +506,44 @@ export async function runAgentTurn(
     await setAgentStatus(agent.id, timedOut ? 'error' : 'idle');
   } catch (e) {
     logger.error({ err: e, agentId: agent.id }, 'runAgentTurn failed');
+
+    // Recover from stale session-id: Claude Code GCs old conversations,
+    // so a previously-stored sessionId may be unknown by the time we
+    // try to resume. Wipe it so the next turn starts fresh — the agent
+    // loses its raw chat history but the persona, rules, decisions,
+    // and live roster all rebuild on the next prompt.
+    const errMsg = (e as { message?: string })?.message ?? '';
+    const isStaleSession =
+      /no conversation found with session id/i.test(errMsg) ||
+      /session_id .* not found/i.test(errMsg) ||
+      /unknown session/i.test(errMsg);
+    if (isStaleSession && agent.sessionId) {
+      logger.warn(
+        { agentId: agent.id, oldSessionId: agent.sessionId },
+        'Stale Claude Code session id detected — clearing for next turn',
+      );
+      try {
+        await db.update(agents).set({ sessionId: null }).where(eq(agents.id, agent.id));
+      } catch (e2) {
+        logger.error({ err: e2 }, 'Failed to clear stale session id');
+      }
+      // Re-enqueue this agent so we retry immediately with a fresh
+      // session. The unread messages are still un-acked, so they'll be
+      // picked back up.
+      try {
+        await enqueueDispatch(agent.id);
+      } catch (e2) {
+        logger.warn({ err: e2 }, 'Failed to re-enqueue after stale-session recovery');
+      }
+    }
+
     try {
-      await setAgentStatus(agent.id, 'error');
+      // After a successful self-recovery the next turn will flip the
+      // agent back to working/idle. Mark error only when we couldn't
+      // self-heal so the operator sees the red dot.
+      await setAgentStatus(agent.id, isStaleSession ? 'idle' : 'error');
     } catch (e2) {
-      logger.error({ err: e2 }, 'Failed to set error status');
+      logger.error({ err: e2 }, 'Failed to set agent status after error');
     }
   }
 }
