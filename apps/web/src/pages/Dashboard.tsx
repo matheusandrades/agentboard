@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { useBoardStore } from '@/lib/store';
 import { AgentAvatar } from '@/components/AgentAvatar';
 import { ActivityPanel } from '@/components/ActivityPanel';
-import { ROLE_TINT, STATUS_DOT } from '@/lib/roles';
+import { ROLE_TINT } from '@/lib/roles';
 import { relativeTime } from '@/lib/time';
 import * as api from '@/lib/api';
 import type { UsageSummary } from '@/lib/types';
