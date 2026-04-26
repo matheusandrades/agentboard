@@ -69,7 +69,7 @@ services:
     ports:
       - "5173:80"
 
-  # Preview/launch_preview service — task 957a6bce (TaskCard polish wave).
+  # Preview/launch_preview service — shared demo container.
   # Self-contained demo build (VITE_DEMO=true seeds tasks/agents/activity)
   # so QA + Uma can open /board, /dashboard etc. without booting the
   # orchestrator + postgres stack.

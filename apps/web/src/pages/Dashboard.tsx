@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { useBoardStore } from '@/lib/store';
 import { AgentAvatar } from '@/components/AgentAvatar';
-import { ROLE_TINT, STATUS_DOT } from '@/lib/roles';
+import { ActivityPanel } from '@/components/ActivityPanel';
+import { ROLE_TINT } from '@/lib/roles';
 import { relativeTime } from '@/lib/time';
 import * as api from '@/lib/api';
 import type { UsageSummary } from '@/lib/types';
@@ -21,7 +22,6 @@ export function Dashboard() {
   const approvals = useBoardStore((s) => s.approvals);
   const previews = useBoardStore((s) => s.previews);
   const messages = useBoardStore((s) => s.messages);
-  const activity = useBoardStore((s) => s.activity);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
 
   useEffect(() => {
@@ -45,7 +45,6 @@ export function Dashboard() {
     () => messages.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5),
     [messages],
   );
-  const recentActivity = activity.slice(0, 8);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -66,7 +65,10 @@ export function Dashboard() {
       />
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
-        <div className="grid gap-4 lg:grid-cols-3">
+        {/* Above-the-fold live activity feed (553eea82). 30 events, 5s poll. */}
+        <ActivityPanel />
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-3">
           {/* Working agents */}
           <Card title="Working now" linkTo="/live" linkLabel="Live →">
             {working.length === 0 ? (
@@ -188,25 +190,7 @@ export function Dashboard() {
             )}
           </Card>
 
-          {/* Recent activity */}
-          <Card title="Recent activity" linkTo="/timeline" linkLabel="Timeline →">
-            <ul className="space-y-1.5">
-              {recentActivity.length === 0 ? (
-                <li className="text-[12px] text-fg-3">No events yet.</li>
-              ) : (
-                recentActivity.map((a) => {
-                  const agent = agents.find((x) => x.id === a.agentId);
-                  return (
-                    <li key={a.id} className="flex items-center gap-2 text-[11px]">
-                      <span className="text-fg-3 font-mono w-12 text-right">{relativeTime(a.createdAt)}</span>
-                      {agent ? <AgentAvatar agent={agent} size="sm" /> : <span className="h-6 w-6 rounded-full bg-sheen/[0.06]" />}
-                      <span className="truncate text-fg-2">{a.eventType}</span>
-                    </li>
-                  );
-                })
-              )}
-            </ul>
-          </Card>
+          {/* Recent activity card moved into the prominent ActivityPanel above. */}
         </div>
 
         {/* Recent stakeholder thread (compact) */}
