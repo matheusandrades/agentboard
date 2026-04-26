@@ -173,7 +173,6 @@
               <button
                 type="button"
                 class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
-                aria-label="GitHub: connected. Step 1 of 4."
               >
                 <!-- Indicator: filled circle + check -->
                 <span
@@ -199,6 +198,7 @@
                     Connect GitHub
                   </span>
                   <!-- Body collapsed in done state -->
+                  <span class="sr-only">step 1 of 4, completed</span>
                 </span>
 
                 <span
@@ -214,7 +214,6 @@
               <button
                 type="button"
                 class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
-                aria-label="Model API key: in progress. Step 2 of 4."
               >
                 <!-- Indicator: spinner -->
                 <span
@@ -249,8 +248,10 @@
                     Add a model API key
                   </span>
                   <span class="mt-1 block text-[13px] leading-[1.4] text-muted">
-                    Agents call OpenAI or Anthropic to think.
+                    Agents need a model provider — bring your OpenAI or
+                    Anthropic key.
                   </span>
+                  <span class="sr-only">step 2 of 4, in progress</span>
                 </span>
 
                 <span
@@ -266,7 +267,6 @@
               <button
                 type="button"
                 class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
-                aria-label="Project: not started. Step 3 of 4."
               >
                 <!-- Indicator: empty circle -->
                 <span
@@ -279,8 +279,9 @@
                     Add a project
                   </span>
                   <span class="mt-1 block text-[13px] leading-[1.4] text-muted">
-                    Pick a repo for agents to work in.
+                    Connect a GitHub repo for agents to work in.
                   </span>
+                  <span class="sr-only">step 3 of 4, not started</span>
                 </span>
 
                 <span
@@ -296,7 +297,6 @@
               <button
                 type="button"
                 class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
-                aria-label="Notifications: not started. Step 4 of 4."
               >
                 <span
                   class="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-hairline-strong"
@@ -305,11 +305,13 @@
 
                 <span class="flex-1 min-w-0">
                   <span class="block text-[15px] font-medium tracking-tight2 text-ink">
-                    Verify notifications
+                    Confirm notifications
                   </span>
                   <span class="mt-1 block text-[13px] leading-[1.4] text-muted">
-                    Choose how we ping you when an agent needs a call.
+                    Pick how we ping you when an agent needs a call —
+                    defaults are fine.
                   </span>
+                  <span class="sr-only">step 4 of 4, not started</span>
                 </span>
 
                 <span
@@ -461,7 +463,7 @@
                 Couldn't load setup status
               </h2>
               <p class="mt-1 text-[13px] leading-[1.4] text-muted">
-                Refresh the page or check your connection.
+                Try again, or check your connection.
               </p>
             </div>
             <button
@@ -537,7 +539,8 @@
                       Add a model API key
                     </p>
                     <p class="mt-1 text-[13px] leading-[1.4] text-muted">
-                      Agents call OpenAI or Anthropic to think.
+                      Agents need a model provider — bring your OpenAI
+                      or Anthropic key.
                     </p>
                     <button
                       type="button"
@@ -550,8 +553,9 @@
               </li>
             </ul>
             <p class="mt-4 text-[11px] text-muted">
-              (Two items shown for brevity; mobile layout repeats for all
-              4.)
+              (Two items shown for brevity; mobile layout repeats for
+              all 4. CTA reads "Set up" — no trailing arrow on mobile,
+              by design; see spec §2.)
             </p>
           </section>
         </div>

@@ -1,6 +1,6 @@
 # Design Spec — `/settings` Setup Checklist
 
-**Status:** ready for review (carl-cto for architectural fit, then merge)
+**Status:** approved (carl-cto + leo-langs, PR #8) — review notes folded in
 **Owner:** uma-uiux → lucas-frontend (impl follow-up card)
 **Task:** ddac153f-e0b8-4972-a1fa-04c8511d6e2f
 **Source gap:** [Empty-state audit §1, §4.12](./empty-states-audit.md)
@@ -37,7 +37,7 @@ The four items, in this order, intentionally:
 1. **Connect GitHub** (highest blocker — agents can't do most work without a repo).
 2. **Configure model API key** (second blocker — agents can't think without a model).
 3. **Add a project** (consequence of GitHub being connected; users may have multiple).
-4. **Verify notifications** (lowest blocker — defaults work; this is "you've seen it").
+4. **Confirm notifications** (lowest blocker — defaults work; this is "you've seen it").
 
 The order is fixed. We're not letting the user reorder; the dependency
 chain (GitHub → API key → project → notifications) is real, even if (3)
@@ -61,15 +61,16 @@ and (4) are technically independent.
 │  │     and open pull requests.                   │  │
 │  │                                               │  │
 │  │  ◯ Add a model API key             [Set up →] │  │
-│  │     Agents call OpenAI or Anthropic           │  │
-│  │     to think.                                 │  │
+│  │     Agents need a model provider —            │  │
+│  │     bring your OpenAI or Anthropic key.       │  │
 │  │                                               │  │
 │  │  ◯ Add a project                   [Set up →] │  │
-│  │     Pick a repo for agents to work in.        │  │
+│  │     Connect a GitHub repo for agents          │  │
+│  │     to work in.                               │  │
 │  │                                               │  │
-│  │  ◯ Verify notifications            [Set up →] │  │
-│  │     Choose how we ping you when an            │  │
-│  │     agent needs a call.                       │  │
+│  │  ◯ Confirm notifications           [Set up →] │  │
+│  │     Pick how we ping you when an              │  │
+│  │     agent needs a call — defaults are fine.   │  │
 │  └───────────────────────────────────────────────┘  │
 │                                                     │
 │  ── Settings sections begin here ───────────────    │
@@ -106,6 +107,12 @@ established in `hello-world-spec.md`):
   rest of the app.
 - The card itself remains full-width within the page padding (22px
   page padding inherited from existing layout).
+- **CTA label drops the trailing arrow on mobile.** Desktop CTA reads
+  "Set up →"; mobile CTA reads "Set up". Reason: on desktop the arrow
+  is a "tap-into-section" affordance for a row that's also a button;
+  on mobile the full-width pill *is* the affordance, so the arrow
+  becomes redundant ornamentation. A small detail, but worth
+  specifying so the impl PR doesn't conform them in either direction.
 - Single layout breakpoint: **734px**, matching the hello-world spec.
 
 ---
@@ -135,13 +142,21 @@ state from the server (covered in §6 Loading & Empty).
 | Item            | Title              | Body                                                   |
 | --------------- | ------------------ | ------------------------------------------------------ |
 | 1. GitHub       | Connect GitHub     | Agents need this to clone repos and open pull requests.|
-| 2. Model key    | Add a model API key| Agents call OpenAI or Anthropic to think.              |
-| 3. Project      | Add a project      | Pick a repo for agents to work in.                     |
-| 4. Notifications| Verify notifications| Choose how we ping you when an agent needs a call.    |
+| 2. Model key    | Add a model API key| Agents need a model provider — bring your OpenAI or Anthropic key. |
+| 3. Project      | Add a project      | Connect a GitHub repo for agents to work in.           |
+| 4. Notifications| Confirm notifications| Pick how we ping you when an agent needs a call — defaults are fine. |
 
-Copy is uma-uiux draft. Per audit §3, voice copy needs `leo-langs`
-sign-off before impl PR ships. Hand off to him after carl-cto's
-architectural review.
+Copy reviewed by `leo-langs` on PR #8 (2026-04-26):
+- Item 2 body rewritten to keep the door open for additional providers
+  (Google, Mistral, local Ollama). Same length, less brittle than naming
+  two specific vendors as a permanent product fact.
+- Item 3 body tightened to make the "project = GitHub repo" equivalence
+  explicit on first encounter (the audit's §4.5 already established it,
+  but a first-time user has no prior context).
+- Item 4 title flipped from "Verify" to "Confirm" so title and body
+  agree on the mechanic: the user is acknowledging defaults, not
+  testing an existing config. Pairs with carl-cto's §7 answer (we add
+  a `notifications_acknowledged_at` flag set on explicit Save) — see §7.
 
 ### 3.2 `in_progress`
 
@@ -322,42 +337,109 @@ comments.
 Render the card with a single row replacing the four items:
 
 - **Title:** "Couldn't load setup status"
-- **Body:** "Refresh the page or check your connection."
+- **Body:** "Try again, or check your connection."
 - **CTA:** "Retry"
+
+(Body verb pairs with CTA verb for consistency — both are "retry"
+shaped, not the body-says-refresh / CTA-says-retry mismatch flagged
+on PR #8 review.)
 
 This is the conventional error pattern — a soft fallback rather than
 a banner. Don't blow up the whole page; the rest of `/settings` is
 still useful even if we can't render the checklist.
 
+### 6.4 Data flow (per carl-cto, PR #8 review)
+
+The checklist's four predicates are owned by the **backend**, not
+re-derived on the client per-row. Single endpoint:
+
+```
+GET /api/setup/status
+→ 200 { github: bool, modelKey: bool, project: bool, notifications: bool }
+```
+
+- Backend owns the truth predicates (env-presence for `modelKey` in v1,
+  table-existence for `project`, install-status for `github`,
+  `notifications_acknowledged_at IS NOT NULL` for `notifications`).
+- Frontend renders the four booleans into the four item states. No
+  client-side branching across individual settings rows.
+- Loading state (§6.1) maps to the request being in flight.
+- Error state (§6.3) maps to a non-2xx response.
+- Re-fetched on `/settings` mount (and after any in-section Save that
+  could flip a bit — `react-query` invalidation on `setup-status` key).
+
+Why one endpoint instead of four `/api/setup/*` rows: the predicate
+logic stays unforkable between client and server, the round-trip
+budget is one not four, and the boolean shape never needs to change
+even if the per-bit data source does (carl's v2 per-user-keys note).
+
 ---
 
-## 7. Open questions (for carl-cto review)
+## 7. carl-cto review answers (PR #8, 2026-04-26)
 
-Asked carl-cto separately (thread `4c37950f-…`); flagging here so
-they don't get lost:
+All three open questions answered. Verdict: **APPROVED for merge** —
+no architectural changes needed beyond the §6.4 data-flow note above.
+Decisions captured here for future-self.
 
-1. **Notifications "verified" — derive or persist?** Today the
-   notifications section may render with defaults the user never
-   explicitly touched. The spec assumes we'll add a small per-user
-   `notifications_acknowledged_at` flag (or equivalent: a per-user
-   key in existing settings JSON) so item 4 has a true "user looked
-   at this" signal. Acceptable, or do we treat default-on as `done`
-   and skip the ack step entirely (in which case item 4 starts as
-   `done` for everyone and the checklist is really 3 items)?
-2. **Model API key check cost.** Item 2's `done` predicate is "user
-   has at least one provider key saved." On every `/settings` render
-   we'd evaluate this. If keys are stored encrypted server-side,
-   confirm "has any key" is a cheap boolean, not a decryption round-trip.
-3. **`/settings` route ownership.** The spec assumes a single page
-   at `/settings` that contains anchor sections for `#integrations`,
-   `#api-keys`, `#projects`, `#notifications`. If the actual layout
-   is split into `/settings/integrations`, etc., the deep-link
-   targets change but the design doesn't — flag if so and lucas
-   adjusts the `href`s.
+### 7.1 Notifications "verified" — add an ack flag
 
-I'm not blocked on these; the spec stands on the assumption "each
-done state is derivable, with one small ack added for notifications."
-carl-cto's answer goes here as an addendum once it lands.
+Add a small per-user flag. Treating "default-on = done" lies to the
+user about a step they never took, and the audit voice rule §3
+("Honest") forbids that.
+
+Concrete shape:
+
+```sql
+ALTER TABLE users
+  ADD COLUMN notifications_acknowledged_at TIMESTAMPTZ NULL;
+```
+
+- Set on explicit user action: clicking **Save** (or equivalent
+  commit) in the notifications section.
+- `done` predicate: `notifications_acknowledged_at IS NOT NULL`.
+- One column, no index needed (read as a scalar on page render).
+- v1 is one-way: once acknowledged, stays acknowledged. v2 may
+  null-it-out on settings change ("you changed channels, please
+  re-verify") — flagged for future, not implemented now.
+
+Bruno-backend picks up the migration + Save handler as a small
+follow-up card alongside lucas-frontend's impl. Alice routes.
+
+### 7.2 Model API key check cost — trivially cheap, today and later
+
+Today: there is no per-user encrypted key store. `ANTHROPIC_API_KEY`
+lives in `.env` (`apps/orchestrator/src/config.ts:21`), single
+instance for the whole orchestrator. There's nothing to decrypt
+because there's nothing per-user to encrypt.
+
+**v1 (this card):** the `modelKey` predicate is a boolean derived
+from the orchestrator's process env at request time. Surfaced via
+the `GET /api/setup/status` endpoint (§6.4). Response includes
+only `{ modelKey: true | false }` — never the key value itself.
+
+**v2 (future, separate ADR):** when per-user provider keys land,
+"has any key" stays cheap — single indexed `EXISTS` against the
+keys table. We don't decrypt to answer existence; decryption only
+happens at model-call time. The checklist's `modelKey` boolean
+keeps the same shape; the source of truth swaps under it. **No
+checklist redesign needed for v2.**
+
+### 7.3 `/settings` route shape — single page with anchors
+
+`/settings` is one page. Section anchors: `#integrations`,
+`#api-keys`, `#projects`, `#notifications`. Reasons:
+
+1. The smooth-scroll-and-highlight on CTA click only works on a
+   single document. Split routes turn it into a full navigation
+   and break the "stay-in-place orientation" mental model.
+2. Route splits cost a load per step. Anchors are free.
+3. The spec's whole story ("the settings page they were always
+   going to see is now there, exactly where it always was") is
+   built on a single page. Don't undermine it.
+
+Revisit only if `/settings` outgrows ~3 screens of options. Today
+it's nowhere close. Lucas wires the four CTAs as `href="/settings#…"`
+deep-links plus a smooth-scroll handler.
 
 ---
 
@@ -375,8 +457,18 @@ carl-cto's answer goes here as an addendum once it lands.
     target, single click target). Inside: `<span aria-hidden="true">`
     for the icon, then visible text title + body, then `<span
     class="sr-only">step 1 of 4, not started</span>`.
+  - **Do not put an `aria-label` on the row `<button>`.** An aria-label
+    on a button overrides the entire visible text — SR users would
+    lose the body sentence (the *why* of each step) and the CTA verb.
+    Visible title + body + sr-only step counter is the right pattern;
+    let the SR read the same content a sighted user gets.
   - State changes announce via `aria-live="polite"` region containing
     text like "Connect GitHub: completed".
+  - **State words are fixed:** `completed` / `in progress` / `not started`.
+    Used in both the sr-only step counter and the aria-live updates.
+    Don't drift to `connected` for item 1 — "completed" reads cleanly
+    for any of the four items, and a user who doesn't know GitHub-specific
+    verbs isn't slowed down by a state word that turned domain-specific.
 - **Keyboard.** Tab moves through items in order. Enter or Space
   triggers the CTA. Escape on a focused row does nothing (the row
   is not modal).
@@ -389,8 +481,11 @@ carl-cto's answer goes here as an addendum once it lands.
 
 - **Implementation.** This spec is design only; lucas-frontend gets a
   follow-up card with this doc + the mockup as inputs.
-- **Backend changes.** If §7 Q1 lands as "yes, add an ack flag",
-  bruno-backend gets a small ticket. Not blocking the design merge.
+- **Backend changes.** Per §7.1 (carl-cto, approved): bruno-backend
+  picks up the `users.notifications_acknowledged_at` column + Save
+  handler as a small follow-up card. Per §6.4: bruno also owns the
+  `GET /api/setup/status` endpoint. Both are scoped from this spec
+  but tracked separately on the kanban — not part of this design PR.
 - **Multi-tenant variants** (org-level checklist that aggregates
   across users). Future card.
 - **A/B testing the card vs. no-card.** We are confident the card
@@ -423,6 +518,15 @@ When the impl card lands:
 8. **Test the 4 → 0 transition explicitly.** The page reflow when
    the card unmounts is the most likely place for jank. If anything
    feels rough, ping me and we'll iterate.
+9. **Consume `GET /api/setup/status`, don't derive client-side.**
+   The four booleans come from one backend call (§6.4). Coordinate
+   with bruno-backend on the endpoint shape — it's small, but it has
+   to land before your impl card can finish. `react-query` key
+   `setup-status`; invalidate on Save in any of the four sections.
+10. **Visible text + sr-only step counter, no row-level `aria-label`.**
+    See §8 — the row `<button>` should let SR readers hear the
+    title, body, and CTA verb naturally. Add only a sr-only span
+    like `step 1 of 4, not started` for the positional context.
 
 Open the mockup at `design/settings-setup-checklist.html` — every
 class on this spec is in there as a working example. Lift the
