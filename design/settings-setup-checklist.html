@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>/settings — Setup Checklist mockup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Design tokens — match hello-world-spec.md so the system stays
+      // single-source-of-truth. No new tokens added by this card.
+      tailwind.config = {
+        theme: {
+          extend: {
+            screens: {
+              tablet: "734px",
+              desktop: "1024px",
+            },
+            colors: {
+              canvas: "#FFFFFF",
+              subtle: "#F5F5F7",
+              ink: "#1D1D1F",
+              muted: "#86868B",
+              hairline: "rgba(0,0,0,0.08)",
+              "hairline-strong": "rgba(0,0,0,0.24)",
+              brand: {
+                DEFAULT: "#0071E3",
+                hover: "#0077ED",
+                active: "#006EDB",
+              },
+              "brand-tint": "rgba(0,113,227,0.08)",
+              danger: "#B42318",
+            },
+            fontFamily: {
+              sf: [
+                "-apple-system",
+                "BlinkMacSystemFont",
+                "SF Pro Display",
+                "SF Pro Text",
+                "Helvetica Neue",
+                "Helvetica",
+                "Arial",
+                "system-ui",
+                "sans-serif",
+              ],
+            },
+            letterSpacing: {
+              display: "-0.015em",
+              tight2: "-0.01em",
+            },
+            maxWidth: {
+              container: "980px",
+            },
+            transitionTimingFunction: {
+              "ease-out-soft": "cubic-bezier(0.2, 0.6, 0.2, 1)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      /* Reduced motion respected globally */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0ms !important;
+          animation-duration: 0ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+
+      /* Focus ring spec: 3px brand at 40% alpha with 2px offset */
+      .row-button:focus-visible,
+      .cta:focus-visible {
+        outline: 3px solid rgba(0, 113, 227, 0.4);
+        outline-offset: 2px;
+      }
+
+      /* Shimmer animation for loading state */
+      @keyframes shimmer {
+        0%,
+        100% {
+          background-color: #f5f5f7;
+        }
+        50% {
+          background-color: rgba(0, 0, 0, 0.06);
+        }
+      }
+      .shimmer {
+        animation: shimmer 1.2s linear infinite;
+      }
+
+      /* Spinner for in-progress server-side step */
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .spinner {
+        animation: spin 1s linear infinite;
+      }
+
+      /* Section anchor highlight (mocked permanently here for review;
+         in real impl: 1500ms ring then 250ms fade-out) */
+      .anchor-highlight {
+        box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.3);
+        border-radius: 12px;
+      }
+
+      /* Mockup canvas — flat gray so the white card pops; *not* a token */
+      body {
+        background-color: #fafafa;
+      }
+    </style>
+  </head>
+
+  <body class="font-sf text-ink antialiased">
+    <!-- ─── Mockup chrome (NOT part of the real UI) ─────────────────── -->
+    <header class="border-b border-hairline bg-canvas">
+      <div class="mx-auto max-w-container px-[22px] py-6 tablet:px-11 desktop:px-0">
+        <p class="text-xs uppercase tracking-tight2 text-muted">Mockup</p>
+        <h1 class="mt-1 text-[28px] font-semibold tracking-tight2 text-ink">
+          /settings — Setup Checklist
+        </h1>
+        <p class="mt-1 max-w-[60ch] text-[13px] leading-[1.5] text-muted">
+          Six states shown stacked for review. In production only one
+          state is visible at a time at the top of <code>/settings</code>.
+          Spec: <code>docs/ux/settings-setup-checklist-spec.md</code>.
+        </p>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-container px-[22px] py-12 tablet:px-11 desktop:px-0">
+      <!-- ─── State 1 — Default (incomplete, 1/4 done) ────────────── -->
+      <section class="mb-16" aria-labelledby="state-1-label">
+        <p
+          id="state-1-label"
+          class="mb-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted"
+        >
+          State 1 — incomplete (1 done, 1 in progress, 2 not started)
+        </p>
+
+        <!-- THE CARD -->
+        <section
+          aria-labelledby="setup-checklist-heading"
+          class="rounded-[12px] border border-hairline bg-canvas p-6 tablet:p-6"
+          style="padding: 24px"
+        >
+          <!-- Header -->
+          <div class="flex items-start justify-between">
+            <div>
+              <h2
+                id="setup-checklist-heading"
+                class="text-[17px] font-semibold tracking-tight2 text-ink"
+              >
+                Get set up
+              </h2>
+              <p class="mt-1 text-[13px] leading-[1.4] text-muted">
+                4 steps to a working agent
+              </p>
+            </div>
+            <div
+              class="text-[13px] font-medium tracking-tight2 text-muted"
+              aria-label="1 of 4 steps complete"
+            >
+              1/4
+            </div>
+          </div>
+
+          <ul class="mt-4 space-y-4" role="list">
+            <!-- Item 1 — DONE — GitHub -->
+            <li>
+              <button
+                type="button"
+                class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
+                aria-label="GitHub: connected. Step 1 of 4."
+              >
+                <!-- Indicator: filled circle + check -->
+                <span
+                  class="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand"
+                  aria-hidden="true"
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="white"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="2.5 6.5 5 9 9.5 3.5" />
+                  </svg>
+                </span>
+
+                <span class="flex-1 min-w-0">
+                  <span class="block text-[15px] font-medium tracking-tight2 text-muted">
+                    Connect GitHub
+                  </span>
+                  <!-- Body collapsed in done state -->
+                </span>
+
+                <span
+                  class="cta shrink-0 rounded-md px-3 py-1 text-[13px] text-muted hover:text-ink"
+                >
+                  Edit
+                </span>
+              </button>
+            </li>
+
+            <!-- Item 2 — IN PROGRESS — model API key (server-side loading) -->
+            <li>
+              <button
+                type="button"
+                class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
+                aria-label="Model API key: in progress. Step 2 of 4."
+              >
+                <!-- Indicator: spinner -->
+                <span
+                  class="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <svg
+                    class="spinner"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                  >
+                    <circle
+                      cx="10"
+                      cy="10"
+                      r="8"
+                      stroke="rgba(0,0,0,0.12)"
+                      stroke-width="1.5"
+                    />
+                    <path
+                      d="M18 10a8 8 0 0 0-8-8"
+                      stroke="#0071E3"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </span>
+
+                <span class="flex-1 min-w-0">
+                  <span class="block text-[15px] font-medium tracking-tight2 text-ink">
+                    Add a model API key
+                  </span>
+                  <span class="mt-1 block text-[13px] leading-[1.4] text-muted">
+                    Agents call OpenAI or Anthropic to think.
+                  </span>
+                </span>
+
+                <span
+                  class="cta shrink-0 rounded-md px-4 py-2 text-[13px] font-medium text-brand transition-colors duration-150 hover:bg-brand-tint"
+                >
+                  Continue →
+                </span>
+              </button>
+            </li>
+
+            <!-- Item 3 — NOT STARTED — project -->
+            <li>
+              <button
+                type="button"
+                class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
+                aria-label="Project: not started. Step 3 of 4."
+              >
+                <!-- Indicator: empty circle -->
+                <span
+                  class="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-hairline-strong"
+                  aria-hidden="true"
+                ></span>
+
+                <span class="flex-1 min-w-0">
+                  <span class="block text-[15px] font-medium tracking-tight2 text-ink">
+                    Add a project
+                  </span>
+                  <span class="mt-1 block text-[13px] leading-[1.4] text-muted">
+                    Pick a repo for agents to work in.
+                  </span>
+                </span>
+
+                <span
+                  class="cta shrink-0 rounded-md px-4 py-2 text-[13px] font-medium text-brand transition-colors duration-150 hover:bg-brand-tint"
+                >
+                  Set up →
+                </span>
+              </button>
+            </li>
+
+            <!-- Item 4 — NOT STARTED — notifications -->
+            <li>
+              <button
+                type="button"
+                class="row-button group flex w-full items-start gap-3 rounded-lg p-2 -m-2 text-left transition-colors duration-150 hover:bg-subtle"
+                aria-label="Notifications: not started. Step 4 of 4."
+              >
+                <span
+                  class="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-hairline-strong"
+                  aria-hidden="true"
+                ></span>
+
+                <span class="flex-1 min-w-0">
+                  <span class="block text-[15px] font-medium tracking-tight2 text-ink">
+                    Verify notifications
+                  </span>
+                  <span class="mt-1 block text-[13px] leading-[1.4] text-muted">
+                    Choose how we ping you when an agent needs a call.
+                  </span>
+                </span>
+
+                <span
+                  class="cta shrink-0 rounded-md px-4 py-2 text-[13px] font-medium text-brand transition-colors duration-150 hover:bg-brand-tint"
+                >
+                  Set up →
+                </span>
+              </button>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Settings sections preview, dimmed for context -->
+        <div class="mt-8 opacity-50">
+          <h3 class="text-[19px] font-semibold tracking-tight2 text-ink">
+            Integrations
+          </h3>
+          <p class="mt-1 text-[13px] text-muted">
+            Existing settings sections begin here. (Anchor target on
+            "Set up →" click; 32px gap above to the card.)
+          </p>
+        </div>
+      </section>
+
+      <!-- ─── State 2 — Affirmation (1.5s transient) ──────────────── -->
+      <section class="mb-16" aria-labelledby="state-2-label">
+        <p
+          id="state-2-label"
+          class="mb-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted"
+        >
+          State 2 — affirmation (renders for 1500ms after the 4th tick, then unmounts)
+        </p>
+
+        <section
+          class="rounded-[12px] border border-hairline bg-canvas"
+          style="padding: 24px"
+          aria-live="polite"
+        >
+          <div class="flex items-center gap-3">
+            <span
+              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand"
+              aria-hidden="true"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="white"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="2.5 6.5 5 9 9.5 3.5" />
+              </svg>
+            </span>
+            <div>
+              <p class="text-[17px] font-semibold tracking-tight2 text-ink">
+                All set
+              </p>
+              <p class="mt-0.5 text-[13px] leading-[1.4] text-muted">
+                You're ready. Settings are right below.
+              </p>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ─── State 3 — Loading skeleton ──────────────────────────── -->
+      <section class="mb-16" aria-labelledby="state-3-label">
+        <p
+          id="state-3-label"
+          class="mb-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted"
+        >
+          State 3 — loading (initial fetch of setup state)
+        </p>
+
+        <section
+          class="rounded-[12px] border border-hairline bg-canvas"
+          style="padding: 24px"
+          aria-busy="true"
+        >
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-[17px] font-semibold tracking-tight2 text-ink">
+                Get set up
+              </h2>
+              <p class="mt-1 text-[13px] leading-[1.4] text-muted">
+                4 steps to a working agent
+              </p>
+            </div>
+            <div class="text-[13px] font-medium tracking-tight2 text-muted">—/4</div>
+          </div>
+
+          <ul class="mt-4 space-y-4">
+            <!-- 4× shimmer rows -->
+            <li class="flex items-start gap-3 p-2 -m-2">
+              <span class="mt-[3px] block h-5 w-5 shrink-0 rounded-full shimmer"></span>
+              <span class="flex-1">
+                <span class="block h-3 w-[40%] rounded shimmer"></span>
+                <span class="mt-2 block h-3 w-[80%] rounded shimmer"></span>
+                <span class="mt-1.5 block h-3 w-[55%] rounded shimmer"></span>
+              </span>
+            </li>
+            <li class="flex items-start gap-3 p-2 -m-2">
+              <span class="mt-[3px] block h-5 w-5 shrink-0 rounded-full shimmer"></span>
+              <span class="flex-1">
+                <span class="block h-3 w-[36%] rounded shimmer"></span>
+                <span class="mt-2 block h-3 w-[78%] rounded shimmer"></span>
+                <span class="mt-1.5 block h-3 w-[50%] rounded shimmer"></span>
+              </span>
+            </li>
+            <li class="flex items-start gap-3 p-2 -m-2">
+              <span class="mt-[3px] block h-5 w-5 shrink-0 rounded-full shimmer"></span>
+              <span class="flex-1">
+                <span class="block h-3 w-[44%] rounded shimmer"></span>
+                <span class="mt-2 block h-3 w-[72%] rounded shimmer"></span>
+              </span>
+            </li>
+            <li class="flex items-start gap-3 p-2 -m-2">
+              <span class="mt-[3px] block h-5 w-5 shrink-0 rounded-full shimmer"></span>
+              <span class="flex-1">
+                <span class="block h-3 w-[42%] rounded shimmer"></span>
+                <span class="mt-2 block h-3 w-[82%] rounded shimmer"></span>
+                <span class="mt-1.5 block h-3 w-[48%] rounded shimmer"></span>
+              </span>
+            </li>
+          </ul>
+        </section>
+      </section>
+
+      <!-- ─── State 4 — Error (state fetch failed) ────────────────── -->
+      <section class="mb-16" aria-labelledby="state-4-label">
+        <p
+          id="state-4-label"
+          class="mb-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted"
+        >
+          State 4 — error (state fetch failed; soft fallback, not a banner)
+        </p>
+
+        <section
+          class="rounded-[12px] border border-hairline bg-canvas"
+          style="padding: 24px"
+          role="alert"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-[17px] font-semibold tracking-tight2 text-ink">
+                Couldn't load setup status
+              </h2>
+              <p class="mt-1 text-[13px] leading-[1.4] text-muted">
+                Refresh the page or check your connection.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="cta shrink-0 rounded-md px-4 py-2 text-[13px] font-medium text-brand transition-colors duration-150 hover:bg-brand-tint"
+            >
+              Retry
+            </button>
+          </div>
+        </section>
+      </section>
+
+      <!-- ─── State 5 — Mobile layout (< 734px) ───────────────────── -->
+      <section class="mb-16" aria-labelledby="state-5-label">
+        <p
+          id="state-5-label"
+          class="mb-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted"
+        >
+          State 5 — mobile (&lt; 734px) — CTA stacks below body, full-width
+        </p>
+
+        <!-- Phone-frame visualization, 360px wide -->
+        <div class="mx-auto" style="max-width: 360px">
+          <section
+            class="rounded-[12px] border border-hairline bg-canvas"
+            style="padding: 16px"
+          >
+            <div class="flex items-start justify-between">
+              <div>
+                <h2 class="text-[17px] font-semibold tracking-tight2 text-ink">
+                  Get set up
+                </h2>
+                <p class="mt-1 text-[13px] leading-[1.4] text-muted">
+                  4 steps to a working agent
+                </p>
+              </div>
+              <div class="text-[13px] font-medium tracking-tight2 text-muted">0/4</div>
+            </div>
+
+            <ul class="mt-4 space-y-4">
+              <li>
+                <div class="flex items-start gap-3">
+                  <span
+                    class="mt-[3px] block h-5 w-5 shrink-0 rounded-full border-[1.5px] border-hairline-strong"
+                    aria-hidden="true"
+                  ></span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[15px] font-medium tracking-tight2 text-ink">
+                      Connect GitHub
+                    </p>
+                    <p class="mt-1 text-[13px] leading-[1.4] text-muted">
+                      Agents need this to clone repos and open pull
+                      requests.
+                    </p>
+                    <button
+                      type="button"
+                      class="cta mt-3 w-full rounded-md bg-brand-tint px-4 py-2 text-center text-[14px] font-medium text-brand transition-colors duration-150 hover:bg-[rgba(0,113,227,0.12)]"
+                    >
+                      Set up
+                    </button>
+                  </div>
+                </div>
+              </li>
+
+              <li>
+                <div class="flex items-start gap-3">
+                  <span
+                    class="mt-[3px] block h-5 w-5 shrink-0 rounded-full border-[1.5px] border-hairline-strong"
+                    aria-hidden="true"
+                  ></span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[15px] font-medium tracking-tight2 text-ink">
+                      Add a model API key
+                    </p>
+                    <p class="mt-1 text-[13px] leading-[1.4] text-muted">
+                      Agents call OpenAI or Anthropic to think.
+                    </p>
+                    <button
+                      type="button"
+                      class="cta mt-3 w-full rounded-md bg-brand-tint px-4 py-2 text-center text-[14px] font-medium text-brand transition-colors duration-150 hover:bg-[rgba(0,113,227,0.12)]"
+                    >
+                      Set up
+                    </button>
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <p class="mt-4 text-[11px] text-muted">
+              (Two items shown for brevity; mobile layout repeats for all
+              4.)
+            </p>
+          </section>
+        </div>
+      </section>
+
+      <!-- ─── State 6 — All four done = card unmounts ─────────────── -->
+      <section aria-labelledby="state-6-label">
+        <p
+          id="state-6-label"
+          class="mb-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted"
+        >
+          State 6 — completed (card is removed from DOM; settings page
+          reflows up)
+        </p>
+
+        <div
+          class="rounded-[12px] border border-dashed border-hairline-strong bg-subtle p-6 text-center"
+        >
+          <p class="text-[13px] text-muted">
+            Card not rendered. <code>/settings</code> shows its sections
+            directly. No "Setup complete" tombstone, no toggle, no
+            "Show again" link.
+          </p>
+        </div>
+      </section>
+
+      <!-- ─── Footer notes for reviewers ──────────────────────────── -->
+      <footer class="mt-16 border-t border-hairline pt-8 text-[12px] leading-[1.5] text-muted">
+        <p class="font-medium text-ink">Reviewer notes</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            Tokens reused from <code>hello-world-spec.md</code>; no new
+            tokens introduced.
+          </li>
+          <li>
+            All transitions: 200ms <code>cubic-bezier(0.2,0.6,0.2,1)</code>;
+            background tints: 150ms.
+          </li>
+          <li>
+            <code>prefers-reduced-motion</code>: all transitions → 0ms;
+            shimmer becomes static; affirmation unmounts immediately
+            (no 1500ms hold).
+          </li>
+          <li>
+            Row IS the button — single tab-stop per item; the visible
+            CTA pill is affordance, not a separate target.
+          </li>
+          <li>
+            Indicator alignment: top of indicator aligns to first line
+            baseline of the title, not row-center.
+          </li>
+        </ul>
+      </footer>
+    </main>
+  </body>
+</html>
