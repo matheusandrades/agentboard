@@ -14,6 +14,7 @@ import { registerMentionRoutes } from './api/mentions.js';
 import { registerAuth, needsSetupGate, requireSession } from './auth/middleware.js';
 import { startDispatcher } from './agents/dispatcher.js';
 import { startNotificationDispatcher } from './notifications/dispatcher.js';
+import { startPrSync } from './integrations/pr_sync.js';
 import { ensureDispatchGroup } from './redis/streams.js';
 import { purgeExpiredSessions } from './auth/sessions.js';
 import { closeDb } from './db/client.js';
@@ -83,6 +84,9 @@ async function main() {
   // Outbound notifications fan-out (Slack/Discord/etc).
   const stopNotifications = await startNotificationDispatcher();
 
+  // Polls merged PRs every 60s and bumps matching tasks to `done`.
+  const prSync = startPrSync();
+
   /* --------------------------- graceful shutdown --------------------- */
   let shuttingDown = false;
   async function shutdown(signal: string) {
@@ -96,6 +100,11 @@ async function main() {
     }
     try {
       stopNotifications();
+    } catch {
+      /* ignore */
+    }
+    try {
+      prSync.stop();
     } catch {
       /* ignore */
     }

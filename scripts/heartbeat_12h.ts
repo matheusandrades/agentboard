@@ -17,8 +17,8 @@ import { agents, messages } from '../apps/orchestrator/src/db/schema.js';
 import { enqueueDispatch } from '../apps/orchestrator/src/redis/streams.js';
 import { logger } from '../apps/orchestrator/src/logger.js';
 
-const INTERVAL_MS = 30 * 60 * 1000; // 30 min
-const TOTAL_CYCLES = 24; // 24 × 30 min = 12 h
+const INTERVAL_MS = 60 * 60 * 1000; // 60 min — earlier 30 min was too noisy
+const TOTAL_CYCLES = 12; // 12 × 60 min = 12 h
 
 const STATUS_CHECK_BODY = (cycle: number, remaining: number) =>
   `**Status check (heartbeat ${cycle}/${TOTAL_CYCLES} — ${(remaining * 30) / 60} h left in the sprint).**
