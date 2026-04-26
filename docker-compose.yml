@@ -67,6 +67,20 @@ services:
     ports:
       - "5173:80"
 
+  # Preview/launch_preview service — task 553eea82.
+  # Self-contained demo build (VITE_DEMO=true seeds activity) so QA + Uma
+  # can open /dashboard without booting the orchestrator + postgres stack.
+  app:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_DEMO: "true"
+        VITE_API_URL: ""
+        VITE_WS_URL: ""
+    ports:
+      - "0:80"
+
 volumes:
   pgdata:
   redisdata:
