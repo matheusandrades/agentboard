@@ -1,13 +1,21 @@
 import { logger } from '../logger.js';
 
 /**
- * Commands an agent is NEVER allowed to run, no matter what the persona says
- * or what the stakeholder asks. The hook runs BEFORE the Bash tool executes,
- * so a denied command never touches the filesystem / network.
+ * Commands an agent is NEVER allowed to run, no matter what the persona
+ * says or what the stakeholder asks. Runs as a PreToolUse hook BEFORE
+ * Bash executes.
  *
- * The overarching policy: merges to shared / production branches are the
- * stakeholder's decision. Agents can push their own branch and open PRs,
- * but they cannot collapse those into the default branch.
+ * Autonomous-mode policy (operator opted in):
+ *   - PR merges via `gh pr merge`           → ALLOWED
+ *   - Local `git merge` / `rebase`          → ALLOWED
+ *   - `git push` directly to main / master  → BLOCKED (forces PR trail)
+ *   - Force-push to protected branches      → BLOCKED
+ *   - Supply-chain publishes (npm/cargo/docker push) → BLOCKED
+ *   - `rm -rf /` and friends                → BLOCKED
+ *
+ * Rationale: keep the audit trail clean (everything must land via a
+ * PR with reviews and check status), but don't force the operator
+ * to be in the loop for routine merges.
  */
 
 /** Branches that, if pushed/merged to, would count as "merging to production". */
@@ -69,23 +77,15 @@ export function inspectBashCommand(command: string): GuardrailDecision {
   }
 
   // ── git merge / rebase onto protected branch ────────────────────
-  if (/^(?:sudo\s+)?git\s+(merge|rebase)\b/i.test(cmd)) {
-    const protectedHit = includesProtectedTarget(cmd);
-    if (protectedHit) {
-      return {
-        allow: false,
-        reason: `git ${lower.split(/\s+/)[1]} involving "${protectedHit}" is blocked. Only open a PR — the stakeholder reviews and merges.`,
-      };
-    }
-  }
+  // Allowed: the operator opted into autonomous mode. Direct local
+  // merges are still riskier than PR merges (no review trail) but the
+  // PR flow stays preferred — direct git push to protected is what we
+  // block below to keep the audit trail intact.
+  void lower; // unused now but kept for forward compatibility
 
-  // ── gh pr merge / gh pr ready-for-merge ─────────────────────────
-  if (/^gh\s+pr\s+merge\b/i.test(cmd)) {
-    return {
-      allow: false,
-      reason: 'Merging pull requests is the stakeholder\'s call. Ask for approval with `request_approval` if you believe the PR is ready.',
-    };
-  }
+  // ── gh pr merge ────────────────────────────────────────────────
+  // Allowed in autonomous mode. PRs still go through GitHub's review +
+  // checks and produce a merge commit with attribution.
 
   // ── npm publish / cargo publish / docker push (supply-chain) ────
   if (/^(npm|pnpm|yarn|bun)\s+publish\b/i.test(cmd)) {

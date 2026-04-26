@@ -98,6 +98,20 @@ export async function createWorktree(agentName: string): Promise<string> {
     throw err;
   }
 
+  // Pin the agent's git identity at the worktree level so any raw
+  // `git commit` (via Bash) attributes to the agent, not to the host's
+  // global config. The MCP commit_code tool also passes -c overrides
+  // for safety, but this keeps `git commit -m '…'` from a Bash tool
+  // call on-brand too.
+  try {
+    await run('git', ['config', 'user.name', agentName], { cwd: worktreePath });
+    await run('git', ['config', 'user.email', `${agentName}@agentboard.local`], {
+      cwd: worktreePath,
+    });
+  } catch (err) {
+    logger.warn({ err, worktreePath }, 'Failed to set per-agent git identity (non-fatal)');
+  }
+
   return worktreePath;
 }
 
@@ -162,10 +176,17 @@ export async function readWorktreeCommits(
 /**
  * Run `git add -A && git commit -m <message>` in the agent's worktree.
  * Returns the commit SHA and files changed count, or null on "nothing to commit".
+ *
+ * When `author` is supplied, the commit is signed under the agent's
+ * identity instead of whatever the host's `git config user.name/email`
+ * happens to be — so commits land in `git log` as
+ * `alice-pm <alice-pm@agentboard.local>` and the human can audit which
+ * agent did what without diving into the audit log.
  */
 export async function commitInWorktree(
   worktreePath: string,
   message: string,
+  author?: { name: string; email: string },
 ): Promise<{ sha: string; filesChanged: number; branch: string | null } | null> {
   // Stage everything.
   await run('git', ['add', '-A'], { cwd: worktreePath });
@@ -182,7 +203,18 @@ export async function commitInWorktree(
     .map((l) => l.trim())
     .filter(Boolean).length;
 
-  await run('git', ['commit', '-m', message], { cwd: worktreePath });
+  // Per-agent identity via `git -c user.name=... -c user.email=...`,
+  // scoped to this single command — never mutates the worktree's
+  // committed config.
+  const idArgs = author
+    ? [
+        '-c',
+        `user.name=${author.name}`,
+        '-c',
+        `user.email=${author.email}`,
+      ]
+    : [];
+  await run('git', [...idArgs, 'commit', '-m', message], { cwd: worktreePath });
   const sha = (await run('git', ['rev-parse', 'HEAD'], { cwd: worktreePath })).stdout.trim();
 
   let branch: string | null = null;

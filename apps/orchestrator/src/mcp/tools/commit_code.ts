@@ -23,7 +23,10 @@ export function commitCodeTool(currentAgentId: string) {
         if (!agent) return err('Current agent not found');
         if (!agent.worktreePath) return err('Agent has no worktree — cannot commit');
 
-        const result = await commitInWorktree(agent.worktreePath, args.message);
+        const result = await commitInWorktree(agent.worktreePath, args.message, {
+          name: agent.name,
+          email: `${agent.name}@agentboard.local`,
+        });
         if (!result) return ok('Nothing to commit (working tree clean).');
 
         const [row] = await db
