@@ -161,9 +161,14 @@ Three lines: **what this surface shows**, **why it's empty**, **what to do**.
 
 ### Current posture (April 2026)
 
-**English-only**, by deliberate choice, until the team decides otherwise.
-The product audience is engineers comfortable with English-language tools.
-Keeping a single language reduces review surface during early iteration.
+**English-only**, by deliberate decision recorded in
+[ADR 0001 — i18n: stay English-only](adr/0001-i18n-defer.md) (2026-04-25).
+No locale files, no `react-i18next` install, no string extraction this
+sprint. Read as policy, not as default — the decision flips only when one
+of the triggers in the ADR fires (paying customer asks for a non-EN UI,
+public multilingual launch, non-EN contributor on the product surface,
+multilingual marketing/docs ship). Until then we keep the i18n-friendly
+authoring rules below so the future flip stays cheap.
 
 ### Forward-looking rules (apply now anyway)
 
@@ -182,21 +187,32 @@ Even before i18n is wired up, write code that won't bite us later:
   `padding-left`, `margin-inline-end` over `margin-right`. Tailwind has
   `ps-*` / `pe-*` utilities — use them on text-bearing elements.
 
-### When the team decides to go multilingual
+### When we flip
 
-The first locale beyond English will likely be **pt-BR** (the stakeholder
-audience). Before that PR lands:
+The first locale beyond English **will be pt-BR**, alongside `en` as the
+canonical source. The library, key format, source path, and extraction
+pipeline are all pre-decided in [ADR 0001](adr/0001-i18n-defer.md) so we
+skip the bikeshed when the trigger arrives:
 
-1. Pick a library (`react-i18next` is the boring default).
-2. Extract every user-facing string into a key file under
-   `apps/web/src/locales/en.json`. Keys are `dot.case` and namespaced by
-   surface: `board.empty.title`, `errors.session.create`.
-3. **Block PRs that introduce raw strings in components.** Lint or a
-   reviewer check — both work.
-4. Date / number formatting always goes through the locale.
-5. Confirm RTL behavior with a quick CSS audit before adding ar/he.
+- **Library:** `react-i18next`.
+- **Keys:** flat dotted, `surface.subject.thing` (e.g. `board.empty.title`,
+  `errors.session.create`).
+- **Source:** `apps/web/src/locales/<lang>.json`, `en` canonical, `pt-BR`
+  alongside.
+- **Pipeline:** build-time extraction (`i18next-parser` or equivalent).
+  Keys ship in the bundle; no runtime fetch.
+- **Enforcement:** ESLint rule banning raw string children in JSX inside
+  `apps/web/src/**`, with an allowlist for code/dev surfaces (logs, debug
+  panels). See ADR 0001 for the exact policy.
 
-Until step 1 lands, this section is forward guidance, not a rule.
+Other things to confirm at flip time, not pre-decided:
+
+- Date / number formatting always goes through the locale (already a rule
+  above — `Intl.*`).
+- RTL behavior — quick CSS audit before adding `ar` / `he`.
+- Lazy-load locale chunks; don't ship every locale on first paint.
+
+Until a trigger fires, this section is the playbook, not a rule.
 
 ---
 
